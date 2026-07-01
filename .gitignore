@@ -4,14 +4,73 @@ __pycache__/
 dist/
 build/
 .eggs/
-venv/
-.env
-*.png
-*.jpg
-data/output/
-data/input/
-data/registro.json
-.ruff_cache/
-.pytest_cache/
 *.egg
-DragonBoatKPI/
+
+# Python virtual env
+venv/
+.venv/
+env/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# FastAPI / Uvicorn
+*.pid
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Data files
+data/input/
+data/output/
+data/registro.json
+data/photos/
+
+# Logs
+*.log
+logs/
+stderr.txt
+stdout.txt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Linting / Formatting
+.ruff_cache/
+.mypy_cache/
+.ruff/
+.python-version
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / npm (si usas frontend tooling)
+node_modules/
+package-lock.json
+
+# Plots / Charts (cache)
+*.mpldat
+*.plotly数据*/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# PDF reports generados
+reports/
+output/
