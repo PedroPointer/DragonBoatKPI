@@ -1,0 +1,175 @@
+﻿{% extends "base.html" %}
+{% block title %}Configuración — Dragon Boat Analyzer{% endblock %}
+{% block content %}
+<h1>Configuración</h1>
+
+{% if section == "main" %}
+<div class="card">
+    <ul class="config-list">
+        <li onclick="window.location='/config/barcos'" style="cursor: pointer;">
+            <div>
+                <div class="config-name">🚤 Gestión de barcos</div>
+                <div class="config-meta">Crear, editar o eliminar embarcaciones</div>
+            </div>
+            <span style="color: #38bdf8;">→</span>
+        </li>
+        <li onclick="window.location='/config/categorias'" style="cursor: pointer;">
+            <div>
+                <div class="config-name">🏷️ Categorías</div>
+                <div class="config-meta">Gestionar categorías de competición</div>
+            </div>
+            <span style="color: #38bdf8;">→</span>
+        </li>
+        <li onclick="window.location='/config/telegram'" style="cursor: pointer;">
+            <div>
+                <div class="config-name">🤖 Telegram Bot</div>
+                <div class="config-meta">Configurar notificaciones por Telegram</div>
+            </div>
+            <span style="color: #38bdf8;">→</span>
+        </li>
+    </ul>
+</div>
+
+{% elif section == "barcos" %}
+<a href="/config" class="back-link">← Volver a configuración</a>
+<h2 style="margin-bottom: 1rem;">Gestión de barcos</h2>
+
+<div class="card">
+    <h2>Añadir barco</h2>
+    <form action="/config/barcos" method="post">
+        <div class="form-row">
+            <div class="field">
+                <label>Nombre</label>
+                <input type="text" name="name" required placeholder="Ej: DB12" style="width: 100px;">
+            </div>
+            <div class="field">
+                <label>Nombre display</label>
+                <input type="text" name="display_name" required placeholder="Ej: Dragon Boat 12">
+            </div>
+            <div class="field">
+                <label>Filas</label>
+                <input type="number" name="num_rows" required value="5" style="width: 80px;">
+            </div>
+            <div class="field">
+                <label>Personas</label>
+                <input type="number" name="total_persons" required value="12" style="width: 80px;">
+            </div>
+            <button type="submit" class="btn">Añadir</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Barcos ({{ boats|length }})</h2>
+    {% if boats %}
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Display</th>
+                <th>Filas</th>
+                <th>Personas</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in boats %}
+            <tr>
+                <td><strong>{{ b.name }}</strong></td>
+                <td>{{ b.display_name }}</td>
+                <td>{{ b.num_rows }}</td>
+                <td>{{ b.total_persons }}</td>
+                <td>
+                    <form action="/config/barcos/{{ b.id }}/delete" method="post" style="display: inline;"
+                          onsubmit="return confirm('Eliminar {{ b.name }}?')">
+                        <button type="submit" class="btn small danger">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+{% elif section == "categorias" %}
+<a href="/config" class="back-link">← Volver a configuración</a>
+<h2 style="margin-bottom: 1rem;">Categorías</h2>
+
+<div class="card">
+    <h2>Añadir categoría</h2>
+    <form action="/config/categorias" method="post">
+        <div class="form-row">
+            <div class="field">
+                <label>Nombre</label>
+                <input type="text" name="name" required placeholder="Ej: Open Sénior">
+            </div>
+            <button type="submit" class="btn">Añadir</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Categorías ({{ categories|length }})</h2>
+    {% if categories %}
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in categories %}
+            <tr>
+                <td><strong>{{ cat.name }}</strong></td>
+                <td>
+                    <form action="/config/categorias/{{ cat.id }}/edit" method="post" style="display: inline-flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" name="name" value="{{ cat.name }}" required style="background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 180px;">
+                        <button type="submit" class="btn small">Guardar</button>
+                    </form>
+                    <form action="/config/categorias/{{ cat.id }}/delete" method="post" style="display: inline;"
+                          onsubmit="return confirm('Eliminar {{ cat.name }}?')">
+                        <button type="submit" class="btn small danger">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+{% elif section == "telegram" %}
+<a href="/config" class="back-link">← Volver a configuración</a>
+<h2 style="margin-bottom: 1rem;">Telegram Bot</h2>
+
+<div class="card">
+    <h2>Configuración de notificaciones</h2>
+    <form>
+        <div class="form-row">
+            <div class="field">
+                <label>Habilitado</label>
+                <select name="enabled">
+                    <option value="no">No</option>
+                    <option value="si">Sí</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Token del bot</label>
+                <input type="password" name="token" placeholder="Introduce el token de Telegram" style="width: 300px;">
+            </div>
+            <div class="field">
+                <label>Chat ID</label>
+                <input type="text" name="chat_id" placeholder="ID del chat de Telegram" style="width: 200px;">
+            </div>
+            <button type="submit" class="btn" disabled>Guardar (próximamente)</button>
+        </div>
+        <p style="color: #64748b; font-size: 0.8rem; margin-top: 1rem;">
+            La configuración del bot de Telegram se integrará próximamente.
+            Por ahora, las notificaciones se muestran por consola.
+        </p>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

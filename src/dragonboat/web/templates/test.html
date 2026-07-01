@@ -1,0 +1,895 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ test.custom_name or "Prueba #" ~ test.test_number }} — Dragon Boat Analyzer{% endblock %}
+{% block extra_head %}
+<style>
+.mapa-container {
+    height: 250px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    transition: height 0.3s ease;
+}
+.mapa-container.minimized {
+    height: 0;
+    margin-bottom: 0;
+}
+.mapa-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+}
+
+/* ── Interactive boat SVG ── */
+.boat-container {
+    position: relative;
+    overflow-x: auto;
+}
+.boat-container svg { max-width: 100%; height: auto; }
+
+.seat { cursor: pointer; }
+.seat:hover .head-placeholder { fill: #475569; }
+.paddler-name {
+    font-size: 16px; font-weight: bold; fill: #ffffff;
+    user-select: none;
+}
+
+#crew-selector {
+    display: none;
+    position: fixed;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+    width: 240px;
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 99999;
+}
+#crew-selector .crew-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    background: #0f172a;
+    border: none;
+    border-bottom: 1px solid #334155;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    outline: none;
+}
+#crew-selector .crew-search:focus {
+    background: #1a2744;
+}
+#crew-selector .crew-search::placeholder { color: #64748b; }
+#crew-selector .crew-option:focus {
+    background: #263548;
+    outline: none;
+}
+#crew-selector .crew-option.highlighted {
+    background: #1e3a5f;
+}
+#crew-selector .no-results {
+    padding: 16px 10px;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.8rem;
+}
+#crew-selector .result-count {
+    padding: 4px 10px;
+    text-align: center;
+    color: #475569;
+    font-size: 0.65rem;
+    border-bottom: 1px solid #334155;
+}
+.crew-option {
+    display: flex; align-items: center;
+    padding: 8px 10px; cursor: pointer;
+    border-bottom: 1px solid #334155;
+}
+.crew-option:hover { background: #263548; }
+.crew-option img {
+    width: 30px; height: 30px; border-radius: 50%;
+    margin-right: 10px; object-fit: cover; background: #334155;
+}
+.crew-option .cname { color: #e2e8f0; font-size: 0.8rem; }
+.crew-option .ccat { color: #64748b; font-size: 0.7rem; margin-left: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="/registros" class="back-link">← Volver a registros</a>
+<h1>{% if test.custom_name %}{{ test.custom_name }}{% else %}Prueba #{{ test.test_number }}{% endif %}</h1>
+<p class="page-meta">
+    {% if test.boat %}{{ test.boat.display_name }}{% endif %}
+    {% if test.categoria %} — {{ test.categoria }}{% endif %}
+</p>
+
+{% if test.metric %}
+{# ── Encabezado de métricas + Editar prueba ── #}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h2 style="margin-bottom: 0;">Métricas</h2>
+        <div class="big-time">{{ "%.2f"|format(test.metric.tiempo_total) }}s</div>
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+        <div class="stat-card">
+            <div class="label">Vel. máxima</div>
+            <div class="value">{{ "%.2f"|format(test.metric.velocidad_maxima) }}</div>
+            <div class="sub">km/h</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Vel. media</div>
+            <div class="value">{{ "%.2f"|format(test.metric.velocidad_media) }}</div>
+            <div class="sub">km/h</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">0 → 12 km/h</div>
+            <div class="value">{{ "%.2f"|format(test.metric.tiempo_12kmh) if test.metric.tiempo_12kmh else '—' }}</div>
+            <div class="sub">s</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Paladas</div>
+            <div class="value">{{ test.metric.num_paladas }}</div>
+            <div class="sub">total</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Dist. palada</div>
+            <div class="value">{{ "%.2f"|format(test.metric.dist_media_palada) }}</div>
+            <div class="sub">m</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Consistencia</div>
+            <div class="value">{{ "%.2f"|format(test.metric.dist_std_palada) if test.metric.dist_std_palada > 0 else '—' }}</div>
+            <div class="sub">m (std)</div>
+        </div>
+    </div>
+
+    {# Editar prueba - subsección dentro de métricas #}
+    <details style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #334155;">
+        <summary style="color: #94a3b8; font-size: 0.85rem; cursor: pointer; font-weight: bold;">Editar prueba</summary>
+        <form action="/test/{{ test.id }}" method="post" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; margin-top: 1rem;">
+            <div class="field">
+                <label>Nombre</label>
+                <input type="text" name="custom_name" placeholder="Nombre" value="{{ test.custom_name or '' }}" list="namesList">
+                <datalist id="namesList">
+                    {% for n in names %}<option value="{{ n }}">{% endfor %}
+                </datalist>
+            </div>
+            <div class="field">
+                <label>Barco</label>
+                <select name="boat_id">
+                    <option value="">— Barco —</option>
+                    {% for b in boats %}
+                    <option value="{{ b.id }}" {% if test.boat_id == b.id %}selected{% endif %}>{{ b.display_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label>Categoría</label>
+                <select name="categoria">
+                    <option value="">— Categoría —</option>
+                    {% for c in categorias %}
+                    <option value="{{ c }}" {% if test.categoria == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn small">Guardar</button>
+        </form>
+    </details>
+</div>
+
+{# ── Mini-mapa GPS (Leaflet) ── #}
+<div class="card">
+    <div class="mapa-controls">
+        <button class="btn small btn-secondary" onclick="toggleMapa()" id="btn-mapa">Minimizar mapa</button>
+    </div>
+    <div id="mapa-trayectoria" class="mapa-container"></div>
+</div>
+
+{# ── Visualizador de gráficas ── #}
+<div class="card" id="chart-card">
+    <div class="chart-toggle-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+        <h2 style="margin-bottom: 0;">Análisis de la carrera</h2>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+            {% if chart_available %}
+            <label style="font-size:0.8rem;color:#94a3b8;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                <input type="checkbox" data-panel="speed" checked style="margin:0;"> Velocidad
+            </label>
+            <label style="font-size:0.8rem;color:#94a3b8;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                <input type="checkbox" data-panel="roll" checked style="margin:0;"> Balanceo
+            </label>
+            <label style="font-size:0.8rem;color:#94a3b8;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                <input type="checkbox" data-panel="pitch" checked style="margin:0;"> Cabeceo
+            </label>
+            <label style="font-size:0.8rem;color:#94a3b8;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                <input type="checkbox" data-panel="dist" checked style="margin:0;"> Dist/palada
+            </label>
+            <button class="btn small btn-secondary" id="btn-toggle-chart">PNG</button>
+            <button class="btn small btn-secondary" id="btn-expand-chart">Expandir ⛶</button>
+            <a class="btn small" href="/test/{{ test.id }}/chart.png" download id="btn-download">Descargar PNG</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Vista PNG (hidden by default) #}
+    <div id="chart-png-container" class="chart-container" style="display: none;">
+        <img id="chart-png" src="/test/{{ test.id }}/chart.png" alt="Gráfica de rendimiento"
+             onerror="this.closest('.card').querySelector('#btn-download').style.display='none';var p=this.parentElement;p.innerHTML='<p style=\"color:#64748b;text-align:center;\">Gráfica no disponible</p>';">
+    </div>
+
+    {# Vista Plotly (default — lazy load on first render) #}
+    <div id="chart-plotly-container"></div>
+</div>
+
+{# ── Datos generales de la carrera ── #}
+<div class="card">
+    <h2>Datos generales</h2>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+        <div>
+            <h3 style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Tramos</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tramo</th>
+                        <th>Tiempo (s)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if test.metric.tiempo_50m %}
+                    <tr><td>0 → 50m</td><td>{{ "%.2f"|format(test.metric.tiempo_50m) }}</td></tr>
+                    {% endif %}
+                    {% if test.metric.tiempo_100m %}
+                    <tr><td>0 → 100m</td><td>{{ "%.2f"|format(test.metric.tiempo_100m) }}</td></tr>
+                    {% endif %}
+                    {% if test.metric.tiempo_150m %}
+                    <tr><td>0 → 150m</td><td>{{ "%.2f"|format(test.metric.tiempo_150m) }}</td></tr>
+                    {% endif %}
+                    <tr><td><strong>200m</strong></td><td><strong>{{ "%.2f"|format(test.metric.tiempo_total) }}</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div>
+            <h3 style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Velocidades</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Métrica</th>
+                        <th>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Vel. máxima</td><td>{{ "%.2f"|format(test.metric.velocidad_maxima) }} km/h</td></tr>
+                    <tr><td>Vel. media</td><td>{{ "%.2f"|format(test.metric.velocidad_media) }} km/h</td></tr>
+                    {% if test.metric.velocidad_min_post10 %}
+                    <tr><td>Vel. mínima post-10m</td><td>{{ "%.2f"|format(test.metric.velocidad_min_post10) }} km/h</td></tr>
+                    {% endif %}
+                    <tr><td>Acel. máxima</td><td>{{ "%.2f"|format(test.metric.aceleracion_max) }} m/s²</td></tr>
+                    <tr><td>0 → 12 km/h</td><td>{{ "%.2f"|format(test.metric.tiempo_12kmh) if test.metric.tiempo_12kmh else '—' }} s</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div>
+            <h3 style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Paladas</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Métrica</th>
+                        <th>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Paladas totales</td><td>{{ test.metric.num_paladas }}</td></tr>
+                    <tr><td>Dist. media/palada</td><td>{{ "%.2f"|format(test.metric.dist_media_palada) }} m</td></tr>
+                    <tr><td>Dist. máxima</td><td>{{ "%.2f"|format(test.metric.dist_max_palada) if test.metric.dist_max_palada else '—' }} m</td></tr>
+                    <tr><td>Dist. mínima (sin la 15 primeras Paladas)</td><td>{{ "%.2f"|format(test.metric.dist_min_palada) if test.metric.dist_min_palada else '—' }} m</td></tr>
+                    <tr><td>Consistencia (std)</td><td>{{ "%.2f"|format(test.metric.dist_std_palada) if test.metric.dist_std_palada > 0 else '—' }} m</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ── Tripulación con SVG interactivo ── #}
+{% if boat %}
+{% set nr = boat.num_rows %}
+{% set svg_viewbox = "0 0 1177 340" if boat.name == 'DB12' else "0 0 1718 359" %}
+{% set svg_hull = "boat_hull_db12.svg.j2" if boat.name == 'DB12' else "boat_hull_db22.svg.j2" %}
+
+<div class="card" id="tripulacion">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h2 style="margin-bottom: 0;">Tripulación</h2>
+        <span class="badge {% if boat.name == 'DB12' %}db12{% else %}db22{% endif %}">{{ boat.display_name }}</span>
+    </div>
+    <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 1rem;">Haz clic en la cabeza de cada palista para asignarlo</p>
+
+    <div class="boat-container"
+         data-crew='{{ crew_json | safe }}'
+         data-assignments='{{ assignments_json | safe }}'
+         data-test-id="{{ test.id }}">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="{{ svg_viewbox }}" width="100%" height="auto" id="boat-svg">
+            <defs>
+                <clipPath id="circleClip">
+                    <circle cx="0" cy="0" r="30" />
+                </clipPath>
+            </defs>
+
+            {# -- Hull from user's SVG -- #}
+            {% include svg_hull %}
+        </svg>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem;">
+        <p style="color: #64748b; font-size: 0.85rem;">
+            <span id="assigned-count">0</span> / {{ boat.total_persons }} asignados
+        </p>
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary small" onclick="limpiarTodo()">Limpiar</button>
+            <button class="btn small" onclick="guardarTripulacion()">Guardar</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleMapa() {
+    var mapEl = document.getElementById("mapa-trayectoria");
+    var btn = document.getElementById("btn-mapa");
+    mapEl.classList.toggle("minimized");
+    btn.textContent = mapEl.classList.contains("minimized")
+        ? "Mostrar mapa" : "Minimizar mapa";
+}
+
+(function() {
+    var container = document.getElementById("mapa-trayectoria");
+    if (!container) return;
+
+    fetch("/test/{{ test.id }}/trajectory")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.points || data.points.length < 2) {
+                container.innerHTML = '<div style="text-align:center;padding:2rem;color:#64748b;">Mapa no disponible — datos GPS no registrados</div>';
+                return;
+            }
+            var map = L.map(container).setView(data.center || [data.points[0][0], data.points[0][1]], 16);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: "&copy; OpenStreetMap contributors",
+                maxZoom: 18
+            }).addTo(map);
+            var latlngs = data.points.map(function(p) { return [p[0], p[1]]; });
+            L.polyline(latlngs, {color: "#38bdf8", weight: 3}).addTo(map);
+            if (data.points.length > 0) {
+                L.circleMarker(latlngs[0], {color: "#22c55e", radius: 6}).addTo(map).bindTooltip("Salida");
+                L.circleMarker(latlngs[latlngs.length-1], {color: "#ef4444", radius: 6}).addTo(map).bindTooltip("Llegada");
+            }
+            map.fitBounds(latlngs, {padding: [20, 20]});
+            setTimeout(function() { map.invalidateSize(); }, 200);
+        })
+        .catch(function() {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:#64748b;">Mapa no disponible</div>';
+        });
+})();
+
+// ── Chart toggle: PNG ↔ Plotly + panel checkboxes ──
+(function() {
+    var btn = document.getElementById("btn-toggle-chart");
+    var pngContainer = document.getElementById("chart-png-container");
+    var plotlyContainer = document.getElementById("chart-plotly-container");
+    var checkboxes = document.querySelectorAll('input[type=checkbox][data-panel]');
+    if (!btn || !pngContainer || !plotlyContainer) return;
+
+    function getActivePanels() {
+        var panels = [];
+        checkboxes.forEach(function(cb) {
+            if (cb.checked) panels.push(cb.getAttribute("data-panel"));
+        });
+        return panels.length > 0 ? panels.join(",") : "speed,roll,pitch,dist";
+    }
+
+    function calcHeight(panels) {
+        var list = panels.split(",");
+        var units = 0;
+        list.forEach(function(p) { units += (p === "speed" ? 3 : 1); });
+        return (units * 180 + 100) + "px";
+    }
+
+    // Default: Plotly loaded immediately with all panels
+    var iframe = document.createElement("iframe");
+    iframe.src = "/test/{{ test.id }}/chart-html?panels=" + getActivePanels();
+    iframe.style.cssText = "width:100%;height:" + calcHeight(getActivePanels()) + ";border:none;";
+    plotlyContainer.appendChild(iframe);
+    btn.textContent = "PNG";
+
+    // Checkbox change → reload iframe with new panels
+    checkboxes.forEach(function(cb) {
+        cb.addEventListener("change", function() {
+            var panels = getActivePanels();
+            iframe.src = "/test/{{ test.id }}/chart-html?panels=" + panels;
+            iframe.style.height = calcHeight(panels);
+        });
+    });
+
+    btn.addEventListener("click", function() {
+        if (plotlyContainer.style.display === "none") {
+            btn.textContent = "PNG";
+            pngContainer.style.display = "none";
+            plotlyContainer.style.display = "block";
+        } else {
+            btn.textContent = "Interactivo";
+            plotlyContainer.style.display = "none";
+            pngContainer.style.display = "block";
+        }
+    });
+
+    // Expand button
+    var expandBtn = document.getElementById("btn-expand-chart");
+    var chartCard = document.getElementById("chart-card");
+    if (expandBtn && chartCard) {
+        var originalHeight = iframe.style.height;
+
+        function expandChart() {
+            chartCard.classList.add("expanded");
+            document.body.classList.add("no-scroll");
+            expandBtn.textContent = "Colapsar ⛶";
+            iframe.style.height = "calc(100vh - 120px)";
+        }
+
+        function collapseChart() {
+            chartCard.classList.remove("expanded");
+            document.body.classList.remove("no-scroll");
+            expandBtn.textContent = "Expandir ⛶";
+            iframe.style.height = originalHeight;
+        }
+
+        expandBtn.addEventListener("click", function() {
+            if (chartCard.classList.contains("expanded")) {
+                collapseChart();
+            } else {
+                expandChart();
+            }
+        });
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape" && chartCard.classList.contains("expanded")) {
+                collapseChart();
+            }
+        });
+
+        // Update originalHeight when checkboxes change panel count
+        checkboxes.forEach(function(cb) {
+            cb.addEventListener("change", function() {
+                if (!chartCard.classList.contains("expanded")) {
+                    var panels = getActivePanels();
+                    originalHeight = calcHeight(panels);
+                    iframe.style.height = originalHeight;
+                }
+            });
+        });
+    }
+})();
+
+// ── Interactive boat crew configurator with seat-markers ──
+(function() {
+    var boatContainer = document.querySelector('.boat-container');
+    if (!boatContainer) return;
+
+    var svg = document.getElementById('boat-svg');
+    if (!svg) return;
+
+    var crewMembers = JSON.parse(boatContainer.getAttribute('data-crew') || '[]');
+    var testId = boatContainer.getAttribute('data-test-id');
+    var existingAssignments = JSON.parse(boatContainer.getAttribute('data-assignments') || '[]');
+    var assignments = {};
+    var currentSeat = null;
+
+    // ── Create selector at body level ──
+    var selector = document.createElement('div');
+    selector.id = 'crew-selector';
+    document.body.appendChild(selector);
+
+    function makeKey(role, side, row) {
+        return role + '_' + (side || '') + '_' + (row || '');
+    }
+
+    // Build assignments map from existing data
+    existingAssignments.forEach(function(a) {
+        var key = makeKey(a.role, a.side, a.row_number);
+        assignments[key] = a.crew_member_id;
+    });
+
+    function getAssignedIds(excludeKey) {
+        var ids = [];
+        for (var k in assignments) {
+            if (assignments[k] && k !== excludeKey) ids.push(assignments[k]);
+        }
+        return ids;
+    }
+
+    // ── Convert seat-marker circles to interactive seats ──
+    function initSeats() {
+        var markers = svg.querySelectorAll('.seat-marker');
+        if (markers.length === 0) return;
+
+        markers.forEach(function(marker) {
+            var ns = 'http://www.w3.org/2000/svg';
+            var cx = parseFloat(marker.getAttribute('cx'));
+            var cy = parseFloat(marker.getAttribute('cy'));
+            var cr = (parseFloat(marker.getAttribute('r')) || 20) + 6;
+            var role = marker.getAttribute('data-role') || 'remero';
+            var side = marker.getAttribute('data-side') || '';
+            var row = marker.getAttribute('data-row') || '';
+
+            var g = document.createElementNS(ns, 'g');
+            g.setAttribute('class', 'seat');
+            g.setAttribute('data-role', role);
+            g.setAttribute('data-side', side);
+            g.setAttribute('data-row', row);
+            g.setAttribute('transform', 'translate(' + cx + ',' + cy + ')');
+            g.style.cursor = 'pointer';
+
+            // placeholder circle (like deportistas photo-placeholder)
+            var circle = document.createElementNS(ns, 'circle');
+            circle.setAttribute('class', 'head-placeholder');
+            circle.setAttribute('cx', '0');
+            circle.setAttribute('cy', '0');
+            circle.setAttribute('r', cr);
+            circle.setAttribute('fill', '#334155');
+            circle.setAttribute('stroke', '#475569');
+            circle.setAttribute('stroke-width', '2');
+            g.appendChild(circle);
+
+            // image (photo)
+            var img = document.createElementNS(ns, 'image');
+            img.setAttribute('class', 'head-image');
+            img.setAttribute('href', '');
+            img.setAttribute('x', -cr);
+            img.setAttribute('y', -cr);
+            img.setAttribute('width', cr * 2);
+            img.setAttribute('height', cr * 2);
+            img.setAttribute('clip-path', 'url(#circleClip)');
+            img.style.display = 'none';
+            g.appendChild(img);
+
+            // initials (like deportistas photo-placeholder — BIG)
+            var txt = document.createElementNS(ns, 'text');
+            txt.setAttribute('class', 'head-initials');
+            txt.setAttribute('x', '0');
+            txt.setAttribute('y', '10');
+            txt.setAttribute('text-anchor', 'middle');
+            txt.setAttribute('dominant-baseline', 'central');
+            txt.setAttribute('font-size', Math.round(cr * 0.85));
+            txt.setAttribute('fill', '#e2e8f0');
+            txt.setAttribute('font-weight', 'bold');
+            txt.setAttribute('font-family', 'Arial, sans-serif');
+            txt.style.display = 'none';
+            g.appendChild(txt);
+
+            // name label (white on dark SVG background)
+            var label = document.createElementNS(ns, 'text');
+            label.setAttribute('class', 'paddler-name');
+            label.setAttribute('x', '0');
+            label.setAttribute('y', cr + 18);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('font-size', '16');
+            label.setAttribute('fill', '#e2e8f0');
+            label.setAttribute('font-weight', 'bold');
+            g.appendChild(label);
+
+            svg.appendChild(g);
+
+            label.textContent = getDefaultLabel(role, side, row);
+            marker.style.display = 'none';
+
+            // click handler
+            g.addEventListener('click', function(e) {
+                e.stopPropagation();
+                openSelector(g, e.clientX, e.clientY);
+            });
+        });
+    }
+
+    function getDefaultLabel(role, side, row) {
+        if (role === 'tambor') return 'Tambor';
+        if (role === 'timonel') return 'Timonel';
+        return (side === 'estribor' ? 'E' : 'B') + row;
+    }
+
+    // ── Type-ahead search ──
+    var searchInput = null;
+
+    function populateSelector(excludeKey) {
+        selector.innerHTML = '';
+
+        // header + search
+        var header = document.createElement('div');
+        header.style.cssText = 'padding:6px 10px;background:#334155;color:#94a3b8;font-size:0.7rem;text-align:center;border-bottom:1px solid #475569;';
+        header.textContent = 'SELECCIONAR TRIPULANTE';
+        selector.appendChild(header);
+
+        var sr = document.createElement('input');
+        sr.className = 'crew-search';
+        sr.type = 'text';
+        sr.placeholder = 'Buscar…';
+        sr.setAttribute('autocomplete', 'off');
+        selector.appendChild(sr);
+        searchInput = sr;
+
+        var assignedIds = getAssignedIds(excludeKey);
+
+        function render(filter) {
+            var existing = selector.querySelectorAll('.crew-option, .no-results, .result-count');
+            existing.forEach(function(el) { el.remove(); });
+
+            var q = (filter || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            var filtered = crewMembers.filter(function(m) {
+                if (!q) return true;
+                var full = (m.nombre + ' ' + m.apellido + ' ' + m.nombre).toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                return full.indexOf(q) !== -1;
+            });
+
+            if (filtered.length === 0) {
+                var none = document.createElement('div');
+                none.className = 'no-results';
+                none.textContent = 'Sin resultados';
+                selector.appendChild(none);
+                return;
+            }
+
+            var rc = document.createElement('div');
+            rc.className = 'result-count';
+            rc.textContent = filtered.length + ' tripulante' + (filtered.length > 1 ? 's' : '');
+            selector.appendChild(rc);
+
+            filtered.forEach(function(m) {
+                var isUsed = assignedIds.indexOf(m.id) !== -1;
+                var div = document.createElement('div');
+                div.className = 'crew-option';
+                div.setAttribute('tabindex', '0');
+                div.setAttribute('data-member-id', m.id);
+                if (isUsed) {
+                    div.style.opacity = '0.35';
+                    div.style.cursor = 'not-allowed';
+                    div.style.pointerEvents = 'none';
+                }
+                var initials = ((m.nombre || '?').charAt(0) + (m.apellido || '?').charAt(0)).toUpperCase();
+                var photoUrl = m.photo_path ? '/photos/' + m.photo_path : '';
+                var avatarHtml = photoUrl
+                    ? '<img src="' + photoUrl + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+                      + '<span style="width:30px;height:30px;border-radius:50%;background:#334155;display:none;align-items:center;justify-content:center;color:#94a3b8;font-size:0.75rem;flex-shrink:0;">' + initials + '</span>'
+                    : '<span style="width:30px;height:30px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:0.75rem;flex-shrink:0;">' + initials + '</span>';
+                div.innerHTML = avatarHtml
+                    + '<span class="cname">' + m.nombre + ' ' + m.apellido + '</span>'
+                    + (m.categoria ? '<span class="ccat">' + m.categoria + '</span>' : '')
+                    + (isUsed ? '<span style="margin-left:auto;font-size:0.65rem;color:#64748b;">asignado</span>' : '');
+                if (!isUsed) {
+                    div.addEventListener('click', function() {
+                        assignMember(m);
+                        closeSelector();
+                    });
+                }
+                div.addEventListener('keydown', function(e) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        var next = this.nextElementSibling;
+                        while (next && next.classList.contains('result-count')) next = next.nextElementSibling;
+                        if (next && next.classList.contains('crew-option')) {
+                            next.focus();
+                            highlightOption(next);
+                        }
+                    }
+                    if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        var prev = this.previousElementSibling;
+                        while (prev && prev.classList.contains('result-count')) prev = prev.previousElementSibling;
+                        if (prev && prev.classList.contains('crew-option')) {
+                            prev.focus();
+                            highlightOption(prev);
+                        }
+                    }
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.click();
+                    }
+                });
+                selector.appendChild(div);
+            });
+        }
+
+        sr.addEventListener('input', function() {
+            render(this.value);
+            highlightFirst();
+        });
+
+        sr.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                var first = selector.querySelector('.crew-option');
+                if (first) { first.focus(); highlightOption(first); }
+            }
+            if (e.key === 'Escape') {
+                closeSelector();
+            }
+        });
+
+        // initial render (full list)
+        render('');
+
+        // focus search
+        setTimeout(function() { sr.focus(); }, 50);
+    }
+
+    function highlightOption(el) {
+        selector.querySelectorAll('.crew-option.highlighted').forEach(function(h) {
+            h.classList.remove('highlighted');
+        });
+        if (el) el.classList.add('highlighted');
+    }
+
+    function highlightFirst() {
+        var first = selector.querySelector('.crew-option');
+        if (first) highlightOption(first);
+    }
+
+    function openSelector(seat, clientX, clientY) {
+        currentSeat = seat;
+        var role = seat.getAttribute('data-role');
+        var side = seat.getAttribute('data-side') || '';
+        var row = seat.getAttribute('data-row') || '';
+        var excludeKey = makeKey(role, side, row);
+        populateSelector(excludeKey);
+
+        // position: fixed relative to viewport
+        var topPos = clientY + 15;
+        var leftPos = clientX + 15;
+        if (leftPos + 240 > window.innerWidth) leftPos = window.innerWidth - 250;
+        if (leftPos < 0) leftPos = 10;
+        if (topPos + 320 > window.innerHeight) topPos = clientY - 330;
+        if (topPos < 10) topPos = 10;
+        selector.style.top = topPos + 'px';
+        selector.style.left = leftPos + 'px';
+        selector.style.display = 'block';
+    }
+
+    function closeSelector() {
+        selector.style.display = 'none';
+        currentSeat = null;
+        searchInput = null;
+    }
+
+    function assignMember(member, seat) {
+        seat = seat || currentSeat;
+        if (!seat) return;
+
+        var role = seat.getAttribute('data-role');
+        var side = seat.getAttribute('data-side') || '';
+        var row = seat.getAttribute('data-row') || '';
+        var key = makeKey(role, side, row);
+        assignments[key] = member.id;
+
+        var placeholder = seat.querySelector('.head-placeholder');
+        var image = seat.querySelector('.head-image');
+        var initialsEl = seat.querySelector('.head-initials');
+        var hasPhoto = member.photo_path && member.photo_path.length > 0;
+
+        if (placeholder) placeholder.style.display = 'none';
+
+        if (hasPhoto) {
+            if (image) {
+                image.setAttribute('href', '/photos/' + member.photo_path);
+                image.style.display = 'block';
+            }
+            if (initialsEl) initialsEl.style.display = 'none';
+        } else {
+            if (image) { image.style.display = 'none'; image.setAttribute('href', ''); }
+            if (initialsEl) {
+                var ini = ((member.nombre || '?').charAt(0) + (member.apellido || '?').charAt(0)).toUpperCase();
+                initialsEl.textContent = ini;
+                initialsEl.style.display = 'block';
+            }
+        }
+
+        var nameEl = seat.querySelector('.paddler-name');
+        if (nameEl) nameEl.textContent = member.nombre;
+
+        updateCount();
+    }
+
+    function updateCount() {
+        var count = Object.keys(assignments).filter(function(k) { return assignments[k]; }).length;
+        var el = document.getElementById('assigned-count');
+        if (el) el.textContent = count;
+    }
+
+    // Click outside closes selector
+    document.addEventListener('click', function(e) {
+        if (!selector.contains(e.target) && !e.target.closest('.seat')) {
+            closeSelector();
+        }
+    });
+
+    // Restore existing assignments
+    function restoreAssignments() {
+        document.querySelectorAll('.seat').forEach(function(seat) {
+            var role = seat.getAttribute('data-role');
+            var side = seat.getAttribute('data-side') || '';
+            var row = seat.getAttribute('data-row') || '';
+            var key = makeKey(role, side, row);
+            var memberId = assignments[key];
+            if (memberId) {
+                var found = crewMembers.find(function(m) { return m.id === memberId; });
+                if (found) assignMember(found, seat);
+            }
+        });
+    }
+
+    // Save
+    window.guardarTripulacion = function() {
+        var payload = [];
+        document.querySelectorAll('.seat').forEach(function(seat) {
+            var role = seat.getAttribute('data-role');
+            var side = seat.getAttribute('data-side') || '';
+            var row = seat.getAttribute('data-row') || '';
+            var key = makeKey(role, side, row);
+            var memberId = assignments[key];
+            if (memberId) {
+                payload.push({
+                    crew_member_id: memberId,
+                    role: role,
+                    side: side || null,
+                    row_number: row ? parseInt(row) : null
+                });
+            }
+        });
+        fetch('/test/' + testId + '/crew/json', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({assignments: payload})
+        }).then(function(r) {
+            if (r.ok) {
+                var msg = document.createElement('div');
+                msg.textContent = '✓ Guardado';
+                msg.style.cssText = 'position:fixed;top:20px;right:20px;background:#16a34a;color:white;padding:8px 16px;border-radius:6px;z-index:99999;font-size:0.85rem;';
+                document.body.appendChild(msg);
+                setTimeout(function() { msg.remove(); }, 2000);
+            } else {
+                alert('Error al guardar');
+            }
+        }).catch(function() { alert('Error de conexión'); });
+    };
+
+    // Clear all
+    window.limpiarTodo = function() {
+        if (!confirm('¿Limpiar todas las asignaciones?')) return;
+        assignments = {};
+        document.querySelectorAll('.seat').forEach(function(seat) {
+            var placeholder = seat.querySelector('.head-placeholder');
+            var image = seat.querySelector('.head-image');
+            var initialsEl = seat.querySelector('.head-initials');
+            if (placeholder) placeholder.style.display = '';
+            if (image) { image.style.display = 'none'; image.setAttribute('href', ''); }
+            if (initialsEl) { initialsEl.style.display = 'none'; initialsEl.textContent = ''; }
+            var nameEl = seat.querySelector('.paddler-name');
+            if (nameEl) {
+                var role = seat.getAttribute('data-role');
+                var side = seat.getAttribute('data-side');
+                var row = seat.getAttribute('data-row');
+                nameEl.textContent = getDefaultLabel(role, side, row);
+            }
+        });
+        updateCount();
+    };
+
+    // ── Init everything ──
+    initSeats();
+    restoreAssignments();
+    updateCount();
+})();
+</script>
+{% endblock %}

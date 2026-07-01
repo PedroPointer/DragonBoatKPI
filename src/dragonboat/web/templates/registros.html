@@ -1,0 +1,242 @@
+﻿{% extends "base.html" %}
+{% block title %}Registros — Dragon Boat Analyzer{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/base.css">
+<style>
+#calendario-container {
+    max-width: 380px;
+    margin: 0 auto 1.5rem auto;
+    padding: 1rem;
+}
+#calendario-container h2 {
+    font-size: 0.8rem;
+    text-align: center;
+    margin-bottom: 0.75rem;
+}
+
+.cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.cal-nav .cal-title {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #e2e8f0;
+    min-width: 100px;
+    text-align: center;
+}
+.cal-nav .cal-year {
+    background: #0f172a;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.15rem 0.3rem;
+    font-size: 0.8rem;
+    width: 60px;
+    text-align: center;
+}
+.cal-nav .cal-year:focus { border-color: #38bdf8; outline: none; }
+.cal-btn {
+    background: #1e293b;
+    color: #38bdf8;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    transition: all 0.2s;
+}
+.cal-btn:hover { background: #1e3a5f; border-color: #38bdf8; }
+
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+}
+.cal-day-header {
+    text-align: center;
+    font-size: 0.65rem;
+    color: #64748b;
+    padding: 0.15rem 0;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+.cal-day {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    padding: 0.2rem;
+    border-radius: 4px;
+    cursor: default;
+    transition: all 0.15s;
+    line-height: 1.8;
+}
+.cal-day--today {
+    background: #334155;
+    color: #e2e8f0;
+    font-weight: bold;
+}
+.cal-day--has-data {
+    background: #064e3b;
+    color: #6ee7b7;
+    cursor: pointer;
+    font-weight: bold;
+}
+.cal-day--has-data:hover {
+    background: #065f46;
+}
+.cal-day--empty { background: transparent; }
+
+.filtros-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.filtros-bar .badge-info {
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+
+.row-link { cursor: pointer; }
+.row-link:hover td { background: #263548; }
+.row-link td:last-child { color: #64748b; font-size: 0.85rem; }
+
+.btn-danger {
+    background: #b91c1c;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-danger:hover { background: #991b1b; }
+
+/* DataTables overrides for dark theme */
+.dataTables_wrapper .dataTables_filter input,
+.dataTables_wrapper .dataTables_length select {
+    background: #0f172a;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+}
+.dataTables_wrapper .dataTables_filter input:focus,
+.dataTables_wrapper .dataTables_length select:focus {
+    border-color: #38bdf8;
+    outline: none;
+}
+.dataTables_wrapper .dataTables_info,
+.dataTables_wrapper .dataTables_length label {
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    color: #94a3b8 !important;
+    background: transparent !important;
+    border: 1px solid #334155 !important;
+    border-radius: 4px;
+    margin: 0 2px;
+    padding: 0.3rem 0.6rem !important;
+    font-size: 0.8rem;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    color: #38bdf8 !important;
+    background: #1e3a5f !important;
+    border-color: #38bdf8 !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    color: #38bdf8 !important;
+    background: #1e293b !important;
+    border-color: #38bdf8 !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Registros</h1>
+
+<div class="card" id="calendario-container">
+    <h2>Calendario de entrenamientos</h2>
+    <div id="calendario"></div>
+</div>
+
+<div class="card">
+    <div class="filtros-bar">
+        <h2 style="margin-bottom: 0;">Historial</h2>
+        <div>
+            <span class="badge badge-info" id="filtro-info">
+                {% if request.query_params.dia %}
+                Mostrando {{ request.query_params.dia }}/{{ request.query_params.mes }}/{{ request.query_params.anio }}
+                {% else %}
+                Mostrando todos los registros
+                {% endif %}
+            </span>
+            <button class="btn small btn-secondary" onclick="limpiarFiltros()" style="margin-left: 0.5rem;">
+                Limpiar filtros
+            </button>
+        </div>
+    </div>
+
+    <table id="tabla-registros" class="display" style="width:100%; color: #e2e8f0;">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Barco</th>
+                <th>Tiempo (s)</th>
+                <th>Categoría</th>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Eliminar</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr class="row-link" onclick="window.location='/test/{{ r.prueba_id }}'">
+                <td>{{ r.numero }}</td>
+                <td>{{ r.nombre or "—" }}</td>
+                <td>{% if r.tipo %}<span class="badge {% if r.tipo == 'competición' %}badge-info{% endif %}">{{ r.tipo }}</span>{% else %}—{% endif %}</td>
+                <td>{% if r.barco %}<span class="badge {% if r.barco == 'DB12' %}db12{% elif r.barco == 'DB22' %}db22{% endif %}">{{ r.barco }}</span>{% else %}—{% endif %}</td>
+                <td>{% if r.tiempo != None %}{{ "%.2f"|format(r.tiempo) }}{% else %}—{% endif %}</td>
+                <td>{% if r.categoria %}<span class="badge">{{ r.categoria }}</span>{% else %}—{% endif %}</td>
+                <td>{{ r.fecha.strftime("%d/%m/%Y") if r.fecha else "—" }}</td>
+                <td>{{ r.hora }}</td>
+                <td>
+                    <form action="/registros/{{ r.prueba_id }}/delete" method="post"
+                          style="display: inline;"
+                          onclick="event.stopPropagation()"
+                          onsubmit="return confirm('¿Eliminar esta prueba?')">
+                        <button type="submit" class="btn-danger">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/calendario.js"></script>
+<script src="/static/js/registros.js"></script>
+<script>
+Calendario({
+    container: "calendario",
+    onDiaClick: function(day, month, year) {
+        filtrarPorDia(day, month, year);
+        document.getElementById("filtro-info").textContent =
+            "Mostrando " + day + "/" + month + "/" + year;
+    }
+});
+</script>
+{% endblock %}

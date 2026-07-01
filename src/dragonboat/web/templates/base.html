@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dragon Boat Analyzer{% endblock %}</title>
+    <link rel="stylesheet" href="/static/base.css">
+
+    <!-- jQuery + DataTables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.11/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.11/js/jquery.dataTables.min.js"></script>
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="/" class="nav-item {% if active_nav == 'dashboard' %}active{% endif %}">
+            <span class="nav-icon">📊</span>
+            <span>Dashboard</span>
+        </a>
+        <a href="/registros" class="nav-item {% if active_nav == 'registros' %}active{% endif %}">
+            <span class="nav-icon">📋</span>
+            <span>Registros</span>
+        </a>
+        <a href="/informes" class="nav-item {% if active_nav == 'informes' %}active{% endif %}">
+            <span class="nav-icon">📄</span>
+            <span>Informes</span>
+        </a>
+        <a href="/deportistas" class="nav-item {% if active_nav == 'deportistas' %}active{% endif %}">
+            <span class="nav-icon">👥</span>
+            <span>Deportistas</span>
+        </a>
+        <a href="/config" class="nav-item {% if active_nav == 'config' %}active{% endif %}">
+            <span class="nav-icon">⚙️</span>
+            <span>Config</span>
+        </a>
+    </nav>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

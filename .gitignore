@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.env
+*.png
+*.jpg
+data/output/
+data/input/
+data/registro.json
+.ruff_cache/
+.pytest_cache/
+*.egg
+DragonBoatKPI/

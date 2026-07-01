@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurador Barco Dragón</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .boat-container {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        /* Estilos interactivos del SVG */
+        .head-group {
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .head-group:hover .head-placeholder {
+            fill: #5a1d56; /* Un tono más oscuro al pasar el ratón */
+        }
+
+        .paddler-name {
+            font-size: 14px;
+            font-weight: bold;
+            fill: white;
+            user-select: none;
+        }
+
+        /* Modal / Popover de selección */
+        #crew-selector {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            width: 200px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .crew-option {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .crew-option:hover {
+            background-color: #f0f0f0;
+        }
+
+        .crew-option img {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+
+<div class="boat-container">
+    <div id="crew-selector"></div>
+
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 450" width="100%" height="auto">
+        <defs>
+            <clipPath id="circleClip">
+                <circle cx="0" cy="0" r="20" />
+            </clipPath>
+
+            <linearGradient id="purpleFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#7c2a78"/>
+                <stop offset="100%" stop-color="#7c2a78"/>
+            </linearGradient>
+
+            <g id="paddler-body">
+                <path d="M-10,25 L-5,60 L15,60 L10,25 Z" fill="#7c2a78"/> <path d="M-5,35 L15,45 L25,70" stroke="#7c2a78" stroke-width="6" fill="none" stroke-linecap="round"/> <line x1="-15" y1="20" x2="35" y2="100" stroke="#7c2a78" stroke-width="5" /> <polygon points="30,90 45,120 25,120" fill="#7c2a78"/> </g>
+
+            <path id="waves" d="M 320,0 Q 340,15 360,0 T 400,0 T 440,0 T 480,0 T 520,0 T 560,0 T 600,0 T 640,0 T 680,0 T 720,0" fill="none" stroke="#7c2a78" stroke-width="6"/>
+        </defs>
+
+        <path d="M 320,300 L 320,250 Q 250,250 180,210 Q 150,190 100,160 Q 80,180 50,170 Q 70,200 40,210 Q 90,260 160,280 Q 240,300 320,300 Z" fill="#7c2a78"/>
+        <path d="M 720,300 L 720,220 Q 820,220 900,150 Q 930,120 950,150 Q 920,180 940,200 Q 880,260 720,300 Z" fill="#7c2a78"/>
+        
+        <use href="#waves" x="0" y="240" />
+        <use href="#waves" x="0" y="250" />
+        <use href="#waves" x="0" y="380" />
+        <use href="#waves" x="0" y="390" />
+
+        <g class="seat" transform="translate(250, 190)">
+            <path d="M-10,25 L-5,60 L15,60 L10,25 Z" fill="#7c2a78"/>
+            <rect x="25" y="45" width="45" height="35" rx="3" fill="#7c2a78"/> <line x1="5" y1="40" x2="35" y2="30" stroke="#7c2a78" stroke-width="4"/> <g class="head-group">
+                <circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/>
+                <image class="head-image" href="" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/>
+            </g>
+            <text class="paddler-name" x="10" y="100" text-anchor="middle">Belén</text>
+        </g>
+
+        <g class="seat" transform="translate(360, 110)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Sara</text>
+        </g>
+        <g class="seat" transform="translate(440, 110)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Inma</text>
+        </g>
+        <g class="seat" transform="translate(520, 110)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Juanjo</text>
+        </g>
+        <g class="seat" transform="translate(600, 110)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">José M</text>
+        </g>
+        <g class="seat" transform="translate(680, 110)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Rafa</text>
+        </g>
+
+        <g class="seat" transform="translate(360, 250)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Elena</text>
+        </g>
+        <g class="seat" transform="translate(440, 250)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Kiril</text>
+        </g>
+        <g class="seat" transform="translate(520, 250)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Lourdes</text>
+        </g>
+        <g class="seat" transform="translate(600, 250)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Jesús V</text>
+        </g>
+        <g class="seat" transform="translate(680, 250)">
+            <use href="#paddler-body"/>
+            <g class="head-group"><circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/><image class="head-image" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/></g>
+            <text class="paddler-name" x="35" y="45" transform="rotate(75, 35, 45)">Maka</text>
+        </g>
+
+        <g class="seat" transform="translate(780, 190)">
+            <path d="M-10,25 L-10,90 L10,90 L10,25 Z" fill="#7c2a78"/> <line x1="0" y1="35" x2="-25" y2="60" stroke="#7c2a78" stroke-width="5"/> <line x1="-30" y1="20" x2="80" y2="150" stroke="#7c2a78" stroke-width="6"/> <g class="head-group">
+                <circle class="head-placeholder" cx="0" cy="0" r="18" fill="#7c2a78"/>
+                <image class="head-image" href="" x="-20" y="-20" width="40" height="40" clip-path="url(#circleClip)" style="display: none;"/>
+            </g>
+            <text class="paddler-name" x="70" y="70" text-anchor="middle">Beltrán</text>
+        </g>
+    </svg>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Datos de ejemplo para tu tripulación
+    const crewMembers = [
+        { id: 1, name: "Sara", img: "https://i.pravatar.cc/150?u=1" },
+        { id: 2, name: "Inma", img: "https://i.pravatar.cc/150?u=2" },
+        { id: 3, name: "Juanjo", img: "https://i.pravatar.cc/150?u=3" },
+        { id: 4, name: "José M", img: "https://i.pravatar.cc/150?u=4" },
+        { id: 5, name: "Rafa", img: "https://i.pravatar.cc/150?u=5" },
+        { id: 6, name: "Nuevo Palista", img: "https://i.pravatar.cc/150?u=6" }
+    ];
+
+    let currentSeat = null; // Guardará el grupo SVG actual que se está editando
+
+    // 1. Renderizar la lista en el modal
+    function populateSelector() {
+        const $selector = $('#crew-selector');
+        $selector.empty();
+        
+        crewMembers.forEach(member => {
+            const optionHtml = `
+                <div class="crew-option" data-name="${member.name}" data-img="${member.img}">
+                    <img src="${member.img}" alt="${member.name}">
+                    <span>${member.name}</span>
+                </div>
+            `;
+            $selector.append(optionHtml);
+        });
+    }
+
+    populateSelector();
+
+    // 2. Evento: Clic en la cabeza de un palista
+    $('.head-group').on('click', function(e) {
+        e.stopPropagation();
+        currentSeat = $(this).closest('.seat'); // Guardamos todo el grupo del asiento
+
+        // Posicionar el modal cerca del ratón
+        const containerOffset = $('.boat-container').offset();
+        const topPos = e.pageY - containerOffset.top + 15;
+        const leftPos = e.pageX - containerOffset.left + 15;
+
+        $('#crew-selector').css({
+            top: topPos + 'px',
+            left: leftPos + 'px'
+        }).fadeIn(150);
+    });
+
+    // 3. Evento: Seleccionar a un palista del modal
+    $(document).on('click', '.crew-option', function() {
+        if (!currentSeat) return;
+
+        const newName = $(this).data('name');
+        const newImg = $(this).data('img');
+
+        // Actualizar la imagen SVG
+        currentSeat.find('.head-image')
+            .attr('href', newImg)
+            .show(); // Mostrar la imagen
+
+        // Ocultar el círculo morado sólido
+        currentSeat.find('.head-placeholder').hide();
+
+        // Actualizar el texto
+        currentSeat.find('.paddler-name').text(newName);
+
+        // Cerrar modal
+        $('#crew-selector').fadeOut(150);
+        currentSeat = null;
+    });
+
+    // 4. Cerrar el modal al hacer clic fuera
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#crew-selector').length) {
+            $('#crew-selector').fadeOut(150);
+        }
+    });
+});
+</script>
+
+</body>
+</html>

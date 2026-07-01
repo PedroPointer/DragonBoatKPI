@@ -1,0 +1,117 @@
+﻿{% extends "base.html" %}
+{% block title %}Informes — Dragon Boat Analyzer{% endblock %}
+{% block content %}
+<h1>Informes</h1>
+
+{% if error %}
+<div class="error">{{ error }}</div>
+{% endif %}
+
+{% if message %}
+<div class="card" style="background: #166534; color: #86efac;">
+    <p>{{ message }}</p>
+</div>
+{% endif %}
+
+{% if duplicate_filename %}
+<div class="card" style="background: #854d0e; color: #fde68a; margin-bottom: 1rem;">
+    <p style="margin-bottom: 0.75rem;">
+        El archivo <strong>{{ duplicate_filename }}</strong> ya está registrado.
+        Para reemplazar la sesión anterior, seleccioná el archivo otra vez y confirmá.
+    </p>
+    <form action="/informes/upload?overwrite=1" method="post" enctype="multipart/form-data"
+          style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+        <input type="file" name="file" accept=".csv" id="overwriteFileInput">
+        <button type="submit" class="btn" id="overwriteSubmitBtn" disabled>Reemplazar sesión existente</button>
+    </form>
+</div>
+{% endif %}
+
+<div class="action-card" onclick="document.getElementById('fileInput').click()">
+    <div class="action-icon">📄</div>
+    <h3>Subir CSV</h3>
+    <p>Arrastra o selecciona un archivo RaceBox Drag para analizar</p>
+</div>
+
+<form id="uploadForm" action="/informes/upload" method="post" enctype="multipart/form-data" style="display: none;">
+    <div class="upload-zone" id="dropZone">
+        <div class="upload-icon">📄</div>
+        <p class="upload-text">
+            Arrastra tu CSV aquí o <strong>haz clic para seleccionar</strong>
+        </p>
+        <p style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem;">
+            Formato: RaceBox Drag (.csv)
+        </p>
+        <input type="file" name="file" id="fileInput" accept=".csv">
+    </div>
+    <div style="text-align: center; margin-top: 1rem;">
+        <button type="submit" class="btn" id="submitBtn" disabled>Analizar</button>
+    </div>
+</form>
+
+<div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Procesando CSV... esto puede tomar unos segundos.</p>
+</div>
+
+<hr style="border: none; border-top: 1px solid #334155; margin: 2rem 0;">
+
+<div class="action-card" onclick="document.getElementById('generateForm').style.display='block'">
+    <div class="action-icon">📋</div>
+    <h3>Generar documentación</h3>
+    <p>Genera PDF con tripulaciones asignadas para competiciones</p>
+</div>
+
+<form id="generateForm" action="/informes/generate" method="post" style="display: none; margin-top: 1rem;">
+    <div class="card">
+        <div class="form-row">
+            <div class="field">
+                <label>Seleccionar competición</label>
+                <select name="session_id">
+                    <option value="">— Seleccionar —</option>
+                </select>
+            </div>
+            <button type="submit" class="btn">Generar PDF</button>
+        </div>
+    </div>
+</form>
+
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const uploadForm = document.getElementById('uploadForm');
+    const loading = document.getElementById('loading');
+
+    document.querySelector('.action-card').addEventListener('click', function(e) {
+        if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A') {
+            uploadForm.style.display = 'block';
+        }
+    });
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault(); this.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            submitBtn.disabled = false;
+            this.querySelector('.upload-text strong').textContent = e.dataTransfer.files[0].name;
+        }
+    });
+    fileInput.addEventListener('change', function() {
+        if (this.files.length) { submitBtn.disabled = false; dropZone.querySelector('.upload-text strong').textContent = this.files[0].name; }
+    });
+    uploadForm.addEventListener('submit', function() { submitBtn.disabled = true; loading.classList.add('active'); });
+
+    // Overwrite file input
+    const overwriteInput = document.getElementById('overwriteFileInput');
+    const overwriteBtn = document.getElementById('overwriteSubmitBtn');
+    if (overwriteInput) {
+        overwriteInput.addEventListener('change', function() {
+            if (this.files.length) { overwriteBtn.disabled = false; }
+        });
+    }
+</script>
+{% endblock %}

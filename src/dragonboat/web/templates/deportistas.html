@@ -1,0 +1,129 @@
+﻿{% extends "base.html" %}
+{% block title %}Deportistas — Dragon Boat Analyzer{% endblock %}
+{% block content %}
+<h1>Deportistas</h1>
+
+<div class="card">
+    <h2>Añadir deportista</h2>
+    <form action="/deportistas/add" method="post" enctype="multipart/form-data">
+        <div class="form-row">
+            <div class="field">
+                <label>Nombre</label>
+                <input type="text" name="nombre" required placeholder="Nombre">
+            </div>
+            <div class="field">
+                <label>Apellido</label>
+                <input type="text" name="apellido" required placeholder="Apellido">
+            </div>
+            <div class="field">
+                <label>Categoría</label>
+                <select name="categoria">
+                    <option value="">— Seleccionar —</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label>Foto</label>
+                <input type="file" name="photo" accept="image/*">
+            </div>
+            <button type="submit" class="btn">Añadir</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Importar desde CSV</h2>
+    <form action="/deportistas/import" method="post" enctype="multipart/form-data">
+        <div class="form-row">
+            <div class="field">
+                <label>CSV (nombre,apellido,categoria)</label>
+                <input type="file" name="file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn">Importar</button>
+        </div>
+        <p style="color: #64748b; font-size: 0.8rem; margin-top: 0.5rem;">
+            Formato: columnas <code>nombre</code>, <code>apellido</code>, <code>categoria</code> (opcional)
+        </p>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Tripulantes ({{ crew|length }})</h2>
+    {% if crew %}
+    <table>
+        <thead>
+            <tr>
+                <th></th>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>Categoría</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cm in crew %}
+            <tr>
+                <td>
+                    {% if cm.photo_path %}
+                    <img src="/photos/{{ cm.photo_path }}" alt="" class="photo-circle">
+                    {% else %}
+                    <div class="photo-placeholder">{{ cm.nombre[0] }}{{ cm.apellido[0] }}</div>
+                    {% endif %}
+                </td>
+                <td class="edit-inline" onclick="toggleEdit({{ cm.id }})">{{ cm.nombre }}</td>
+                <td class="edit-inline" onclick="toggleEdit({{ cm.id }})">{{ cm.apellido }}</td>
+                <td>
+                    {% if cm.categoria %}<span class="badge">{{ cm.categoria }}</span>{% else %}<span style="color: #475569;">—</span>{% endif %}
+                </td>
+                <td>
+                    <button class="btn small btn-secondary" onclick="toggleEdit({{ cm.id }})">Editar</button>
+                    <form action="/deportistas/{{ cm.id }}/delete" method="post" style="display: inline;"
+                          onsubmit="return confirm('Eliminar {{ cm.nombre }} {{ cm.apellido }}?')">
+                        <button type="submit" class="btn small danger">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            <tr id="edit-row-{{ cm.id }}" class="edit-form">
+                <td colspan="5">
+                    <form action="/deportistas/{{ cm.id }}/edit" method="post" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <div class="field">
+                            <label>Nombre</label>
+                            <input type="text" name="nombre" value="{{ cm.nombre }}" required>
+                        </div>
+                        <div class="field">
+                            <label>Apellido</label>
+                            <input type="text" name="apellido" value="{{ cm.apellido }}" required>
+                        </div>
+                        <div class="field">
+                            <label>Categoría</label>
+                            <select name="categoria">
+                                <option value="">— Sin categoría —</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.name }}" {% if cm.categoria == cat.name %}selected{% endif %}>{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn small">Guardar</button>
+                        <button type="button" class="btn small btn-secondary" onclick="toggleEdit({{ cm.id }})">Cancelar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #64748b; text-align: center;">No hay deportistas registrados.</p>
+    {% endif %}
+</div>
+
+<script>
+function toggleEdit(id) {
+    const rows = document.querySelectorAll('#edit-row-' + id);
+    rows.forEach(function(row) {
+        row.classList.toggle('visible');
+    });
+}
+</script>
+{% endblock %}
