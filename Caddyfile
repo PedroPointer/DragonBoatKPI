@@ -1,4 +1,4 @@
-dragonboatkpi.duckdns.org {
+{$DOMAIN} {
     encode gzip
 
     @static {
