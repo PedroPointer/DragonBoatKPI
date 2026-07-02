@@ -1,0 +1,44 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: dragonboat-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - dragonboat_net
+    depends_on:
+      web:
+        condition: service_healthy
+
+  web:
+    build: .
+    container_name: dragonboat-web
+    restart: unless-stopped
+    expose:
+      - "8000"
+    env_file: .env
+    volumes:
+      - dragonboat_data:/app/data
+    networks:
+      - dragonboat_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  dragonboat_net:
+    driver: bridge
+
+volumes:
+  dragonboat_data:
+  caddy_data:
+  caddy_config:

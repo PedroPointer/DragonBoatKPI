@@ -554,7 +554,7 @@ def graficar_200m_plotly(
                 x=pt, y=ps,
                 text=str(i + 1),
                 showarrow=False,
-                yshift=12,
+                yshift=22,
                 font=dict(color="#1a1a1a", size=9),
                 bgcolor="white", borderpad=2,
                 opacity=0.9,

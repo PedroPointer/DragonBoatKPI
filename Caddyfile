@@ -1,0 +1,15 @@
+dragonboatkpi.duckdns.org {
+    encode gzip
+
+    @static {
+        path /static/* /charts/* /photos/*
+    }
+    header @static Cache-Control "public, max-age=2592000"
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+    }
+
+    reverse_proxy web:8000
+}
