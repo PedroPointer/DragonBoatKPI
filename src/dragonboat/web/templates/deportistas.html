@@ -34,24 +34,9 @@
 </div>
 
 <div class="card">
-    <h2>Importar desde CSV</h2>
-    <form action="/deportistas/import" method="post" enctype="multipart/form-data">
-        <div class="form-row">
-            <div class="field">
-                <label>CSV (nombre,apellido,categoria)</label>
-                <input type="file" name="file" accept=".csv" required>
-            </div>
-            <button type="submit" class="btn">Importar</button>
-        </div>
-        <p style="color: #64748b; font-size: 0.8rem; margin-top: 0.5rem;">
-            Formato: columnas <code>nombre</code>, <code>apellido</code>, <code>categoria</code> (opcional)
-        </p>
-    </form>
-</div>
-
-<div class="card">
     <h2>Tripulantes ({{ crew|length }})</h2>
     {% if crew %}
+    <div class="table-wrapper">
     <table>
         <thead>
             <tr>
@@ -87,7 +72,7 @@
             </tr>
             <tr id="edit-row-{{ cm.id }}" class="edit-form">
                 <td colspan="5">
-                    <form action="/deportistas/{{ cm.id }}/edit" method="post" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                    <form action="/deportistas/{{ cm.id }}/edit" method="post" enctype="multipart/form-data" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                         <div class="field">
                             <label>Nombre</label>
                             <input type="text" name="nombre" value="{{ cm.nombre }}" required>
@@ -105,6 +90,10 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        <div class="field">
+                            <label>Foto</label>
+                            <input type="file" name="photo" accept="image/*">
+                        </div>
                         <button type="submit" class="btn small">Guardar</button>
                         <button type="button" class="btn small btn-secondary" onclick="toggleEdit({{ cm.id }})">Cancelar</button>
                     </form>
@@ -113,9 +102,26 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
     <p style="color: #64748b; text-align: center;">No hay deportistas registrados.</p>
     {% endif %}
+</div>
+
+<div class="card">
+    <h2>Importar desde CSV</h2>
+    <form action="/deportistas/import" method="post" enctype="multipart/form-data">
+        <div class="form-row">
+            <div class="field">
+                <label>CSV (nombre,apellido,categoria)</label>
+                <input type="file" name="file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn">Importar</button>
+        </div>
+        <p style="color: #64748b; font-size: 0.8rem; margin-top: 0.5rem;">
+            Formato: columnas <code>nombre</code>, <code>apellido</code>, <code>categoria</code> (opcional)
+        </p>
+    </form>
 </div>
 
 <script>

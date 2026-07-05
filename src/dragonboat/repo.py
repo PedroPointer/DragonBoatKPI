@@ -22,6 +22,7 @@ from dragonboat.db_models import (
     Sesion,
     TestMetric,
     TestGpsData,
+    TestType,
     CrewMember,
     CrewAssignment,
 )
@@ -263,6 +264,7 @@ def get_ranking(
     with get_session() as s:
         q = (
             s.query(
+                Sesion.id.label("sesion_id"),
                 TestMetric.tiempo_total,
                 TestMetric.velocidad_media,
                 TestMetric.velocidad_maxima,
@@ -282,6 +284,7 @@ def get_ranking(
             q = q.filter(Boat.name == boat_name)
         return [
             {
+                "sesion_id": r.sesion_id,
                 "tiempo_total": r.tiempo_total,
                 "velocidad_media": r.velocidad_media,
                 "velocidad_maxima": r.velocidad_maxima,
@@ -534,6 +537,48 @@ def delete_category(category_id: int) -> bool:
         if not cat:
             return False
         s.delete(cat)
+        s.commit()
+        return True
+
+
+# ── TestType CRUD ──
+
+def list_test_types() -> list[TestType]:
+    with get_session() as s:
+        return s.query(TestType).order_by(TestType.name).all()
+
+
+def get_test_type(type_id: int) -> Optional[TestType]:
+    with get_session() as s:
+        return s.query(TestType).filter(TestType.id == type_id).first()
+
+
+def crear_test_type(name: str) -> TestType:
+    with get_session() as s:
+        tt = TestType(name=name)
+        s.add(tt)
+        s.commit()
+        s.refresh(tt)
+        return tt
+
+
+def update_test_type(type_id: int, name: str) -> Optional[TestType]:
+    with get_session() as s:
+        tt = s.query(TestType).filter(TestType.id == type_id).first()
+        if not tt:
+            return None
+        tt.name = name
+        s.commit()
+        s.refresh(tt)
+        return tt
+
+
+def delete_test_type(type_id: int) -> bool:
+    with get_session() as s:
+        tt = s.query(TestType).filter(TestType.id == type_id).first()
+        if not tt:
+            return False
+        s.delete(tt)
         s.commit()
         return True
 

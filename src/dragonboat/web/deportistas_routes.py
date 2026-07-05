@@ -102,6 +102,7 @@ async def deportistas_edit(
     nombre: str = Form(...),
     apellido: str = Form(...),
     categoria: str = Form(None),
+    photo: UploadFile = File(None),
 ):
     update_crew_member(
         member_id,
@@ -109,6 +110,14 @@ async def deportistas_edit(
         apellido=apellido.strip(),
         categoria=categoria or None,
     )
+    if photo and photo.filename:
+        content = await photo.read()
+        filename = _save_photo(member_id, content)
+        with db_session() as s:
+            db_cm = s.query(CrewMember).filter(CrewMember.id == member_id).first()
+            if db_cm:
+                db_cm.photo_path = filename
+                s.commit()
     return RedirectResponse(url="/deportistas", status_code=302)
 
 

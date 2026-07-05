@@ -154,6 +154,16 @@ class Category(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
+# ── TestType (entreno / competicion) ──
+
+class TestType(Base):
+    __tablename__ = "test_types"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(20), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
 # ── TestGpsData (full 25Hz sensor data as JSON, one row per sesion) ──
 
 class TestGpsData(Base):

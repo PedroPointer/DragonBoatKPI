@@ -20,6 +20,13 @@
             </div>
             <span style="color: #38bdf8;">→</span>
         </li>
+        <li onclick="window.location='/config/tipos'" style="cursor: pointer;">
+            <div>
+                <div class="config-name">🧪 Tipos de prueba</div>
+                <div class="config-meta">Gestionar tipos (entreno, competicion…)</div>
+            </div>
+            <span style="color: #38bdf8;">→</span>
+        </li>
         <li onclick="window.location='/config/telegram'" style="cursor: pointer;">
             <div>
                 <div class="config-name">🤖 Telegram Bot</div>
@@ -62,6 +69,7 @@
 <div class="card">
     <h2>Barcos ({{ boats|length }})</h2>
     {% if boats %}
+    <div class="table-wrapper">
     <table>
         <thead>
             <tr>
@@ -89,6 +97,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% endif %}
 </div>
 
@@ -130,6 +139,54 @@
                     </form>
                     <form action="/config/categorias/{{ cat.id }}/delete" method="post" style="display: inline;"
                           onsubmit="return confirm('Eliminar {{ cat.name }}?')">
+                        <button type="submit" class="btn small danger">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+{% elif section == "tipos" %}
+<a href="/config" class="back-link">← Volver a configuración</a>
+<h2 style="margin-bottom: 1rem;">Tipos de prueba</h2>
+
+<div class="card">
+    <h2>Añadir tipo</h2>
+    <form action="/config/tipos" method="post">
+        <div class="form-row">
+            <div class="field">
+                <label>Nombre</label>
+                <input type="text" name="name" required placeholder="Ej: entreno">
+            </div>
+            <button type="submit" class="btn">Añadir</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Tipos ({{ test_types|length }})</h2>
+    {% if test_types %}
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in test_types %}
+            <tr>
+                <td><strong>{{ t.name }}</strong></td>
+                <td>
+                    <form action="/config/tipos/{{ t.id }}/edit" method="post" style="display: inline-flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" name="name" value="{{ t.name }}" required style="background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 180px;">
+                        <button type="submit" class="btn small">Guardar</button>
+                    </form>
+                    <form action="/config/tipos/{{ t.id }}/delete" method="post" style="display: inline;"
+                          onsubmit="return confirm('Eliminar {{ t.name }}?')">
                         <button type="submit" class="btn small danger">Eliminar</button>
                     </form>
                 </td>

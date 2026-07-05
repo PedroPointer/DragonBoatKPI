@@ -47,6 +47,44 @@
 </div>
 {% endif %}
 
+{% if ranking %}
+<div class="card">
+    <h2>Ranking de tiempos (Top 20)</h2>
+    <div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Barco</th>
+                <th>Categoría</th>
+                <th>Tiempo</th>
+                <th>Vel. media</th>
+                <th>Paladas</th>
+                <th>Dist. palada</th>
+                <th>Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in ranking %}
+            <tr class="row-link" onclick="window.location='/test/{{ r.sesion_id }}'">
+                <td><span class="rank {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% endif %}">{{ loop.index }}</span></td>
+                <td><strong>{{ r.custom_name or "—" }}</strong></td>
+                <td><span class="badge {% if r.boat_name == 'DB12' %}db12{% elif r.boat_name == 'DB22' %}db22{% endif %}">{{ r.boat_name or "—" }}</span></td>
+                <td>{{ r.categoria or "—" }}</td>
+                <td><span class="badge info">{{ "%.2f"|format(r.tiempo_total) }}s</span></td>
+                <td>{{ "%.2f"|format(r.velocidad_media) }}</td>
+                <td>{{ r.num_paladas }}</td>
+                <td>{{ "%.2f"|format(r.dist_media_palada) }}m</td>
+                <td style="color: #64748b; font-size: 0.8rem;">{{ r.fecha.strftime("%d/%m/%y") if r.fecha else '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
 {% if incomplete %}
 <div class="card">
     <h2>Pendientes de completar</h2>
@@ -67,42 +105,6 @@
         <a href="/test/{{ item.sesion.id }}#tripulacion" class="session-link">Asignar →</a>
     </div>
     {% endfor %}
-</div>
-{% endif %}
-
-{% if ranking %}
-<div class="card">
-    <h2>Ranking de tiempos (Top 20)</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Nombre</th>
-                <th>Barco</th>
-                <th>Categoría</th>
-                <th>Tiempo</th>
-                <th>Vel. media</th>
-                <th>Paladas</th>
-                <th>Dist. palada</th>
-                <th>Fecha</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in ranking %}
-            <tr>
-                <td><span class="rank {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% endif %}">{{ loop.index }}</span></td>
-                <td><strong>{{ r.custom_name or "—" }}</strong></td>
-                <td><span class="badge {% if r.boat_name == 'DB12' %}db12{% elif r.boat_name == 'DB22' %}db22{% endif %}">{{ r.boat_name or "—" }}</span></td>
-                <td>{{ r.categoria or "—" }}</td>
-                <td><span class="badge info">{{ "%.2f"|format(r.tiempo_total) }}s</span></td>
-                <td>{{ "%.2f"|format(r.velocidad_media) }}</td>
-                <td>{{ r.num_paladas }}</td>
-                <td>{{ "%.2f"|format(r.dist_media_palada) }}m</td>
-                <td style="color: #64748b; font-size: 0.8rem;">{{ r.fecha.strftime("%d/%m/%y") if r.fecha else '' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
 </div>
 {% endif %}
 {% endblock %}

@@ -36,7 +36,7 @@ def get_session() -> Session:
 
 def init_db() -> None:
     """Create all tables and seed reference data."""
-    from dragonboat.db_models import Base, Boat, Category
+    from dragonboat.db_models import Base, Boat, Category, TestType
 
     Base.metadata.create_all(bind=engine)
 
@@ -57,6 +57,16 @@ def init_db() -> None:
             from dragonboat.db_models import CATEGORIAS_COMPETICION
             session.add_all([
                 Category(name=name) for name in CATEGORIAS_COMPETICION
+            ])
+            session.commit()
+
+    # Seed test types if empty
+    with get_session() as session:
+        existing = session.query(TestType).count()
+        if existing == 0:
+            session.add_all([
+                TestType(name="entreno"),
+                TestType(name="competicion"),
             ])
             session.commit()
 

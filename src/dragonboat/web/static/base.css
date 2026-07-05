@@ -45,6 +45,11 @@ table {
     border-collapse: collapse;
 }
 
+.table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 th {
     text-align: left;
     color: #64748b;
@@ -86,6 +91,27 @@ a:hover { text-decoration: underline; }
     left: 50%;
     transform: translateX(-50%);
     border-radius: 16px 16px 0 0;
+}
+
+@media (max-width: 600px) {
+    .bottom-nav {
+        max-width: 100%;
+        border-radius: 0;
+        left: 0;
+        transform: none;
+        padding: 0.6rem 0;
+    }
+    .nav-item {
+        font-size: 0.7rem;
+        min-width: 50px;
+        padding: 0.4rem 0.4rem;
+    }
+    .nav-item .nav-icon {
+        font-size: 1.5rem;
+    }
+    body {
+        padding-bottom: 85px;
+    }
 }
 
 .nav-item {

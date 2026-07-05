@@ -45,6 +45,10 @@ from dragonboat.repo import (
     crear_category,
     update_category,
     delete_category,
+    list_test_types,
+    crear_test_type,
+    update_test_type,
+    delete_test_type,
     get_dias_con_entrenamientos,
     list_crew,
     get_assignments,
@@ -124,7 +128,7 @@ async def registros_list(
             "numero": s.test_number,
             "nombre": s.custom_name or "",
             "tipo": s.tipo or "",
-            "barco": s.boat.display_name if s.boat else "",
+            "barco": s.boat.name if s.boat else "",
             "tiempo": s.metric.tiempo_total if s.metric else None,
             "categoria": s.categoria or "",
             "fecha": s.fecha_hora,
@@ -201,6 +205,7 @@ async def test_page(request: Request, test_id: int):
         boats = s.query(Boat).all()
 
     names = get_distinct_names()
+    tipos = list_test_types()
 
     # Boat for crew section
     boat = test.boat
@@ -233,6 +238,7 @@ async def test_page(request: Request, test_id: int):
             "boats": boats,
             "names": names,
             "categorias": CATEGORIAS,
+            "tipos": tipos,
             "crew_json": crew_json,
             "assignments_json": assignments_json,
             "active_nav": "registros",
@@ -247,12 +253,14 @@ async def test_update(
     custom_name: str = Form(None),
     categoria: str = Form(None),
     boat_id: int = Form(None),
+    tipo: str = Form(None),
 ):
     update_sesion(
         test_id,
         custom_name=custom_name.strip() if custom_name else None,
         categoria=categoria or None,
         boat_id=boat_id,
+        tipo=tipo or None,
     )
     return RedirectResponse(url=f"/test/{test_id}", status_code=302)
 
@@ -570,6 +578,40 @@ async def config_categorias_edit(cat_id: int, name: str = Form(...)):
 async def config_categorias_delete(cat_id: int):
     delete_category(cat_id)
     return RedirectResponse(url="/config/categorias", status_code=302)
+
+
+# ── Config: Tipos ──
+
+@router.get("/config/tipos", response_class=HTMLResponse)
+async def config_tipos(request: Request):
+    test_types = list_test_types()
+    return templates.TemplateResponse(
+        name="config.html",
+        request=request,
+        context={
+            "active_nav": "config",
+            "section": "tipos",
+            "test_types": test_types,
+        },
+    )
+
+
+@router.post("/config/tipos")
+async def config_tipos_post(name: str = Form(...)):
+    crear_test_type(name=name)
+    return RedirectResponse(url="/config/tipos", status_code=302)
+
+
+@router.post("/config/tipos/{type_id}/edit")
+async def config_tipos_edit(type_id: int, name: str = Form(...)):
+    update_test_type(type_id, name=name)
+    return RedirectResponse(url="/config/tipos", status_code=302)
+
+
+@router.post("/config/tipos/{type_id}/delete")
+async def config_tipos_delete(type_id: int):
+    delete_test_type(type_id)
+    return RedirectResponse(url="/config/tipos", status_code=302)
 
 
 # ── Config: Telegram ──
