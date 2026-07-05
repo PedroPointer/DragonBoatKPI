@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # Visualization params
     roll_alert_deg: float = 3.0
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     @property
     def resolved_input_dir(self) -> Path:
