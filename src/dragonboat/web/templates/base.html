@@ -2,8 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}Dragon Boat Analyzer{% endblock %}</title>
+    
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="/static/base.css">
 
     <!-- jQuery + DataTables -->
@@ -22,16 +28,17 @@
 </head>
 <body>
     <div class="container">
+        {% block breadcrumbs %}{% endblock %}
         {% block content %}{% endblock %}
     </div>
 
     <nav class="bottom-nav">
         <a href="/" class="nav-item {% if active_nav == 'dashboard' %}active{% endif %}">
-            <span class="nav-icon">📊</span>
-            <span>Dashboard</span>
+            <span class="nav-icon">🏠</span>
+            <span>Home</span>
         </a>
         <a href="/registros" class="nav-item {% if active_nav == 'registros' %}active{% endif %}">
-            <span class="nav-icon">📋</span>
+            <img src="/static/img/iconoDragon.svg" alt="" class="nav-icon-svg">
             <span>Registros</span>
         </a>
         <a href="/informes" class="nav-item {% if active_nav == 'informes' %}active{% endif %}">
@@ -47,6 +54,46 @@
             <span>Config</span>
         </a>
     </nav>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+    function showToast(message, type) {
+        if (typeof type === 'undefined') type = '';
+        var container = document.getElementById('toast-container');
+        if (!container) return;
+        var el = document.createElement('div');
+        el.className = 'toast' + (type ? ' ' + type : '');
+        el.textContent = message;
+        container.appendChild(el);
+        setTimeout(function() { if (el.parentNode) el.remove(); }, 3000);
+    }
+
+    function openModal(id) {
+        var overlay = document.getElementById(id);
+        if (!overlay) return;
+        overlay.classList.add('visible');
+        document.body.classList.add('no-scroll');
+        var firstInput = overlay.querySelector('input:not([type=hidden]), select, textarea');
+        if (firstInput) setTimeout(function() { firstInput.focus(); }, 150);
+    }
+
+    function closeModal(id) {
+        var overlay = document.getElementById(id);
+        if (!overlay) return;
+        overlay.classList.remove('visible');
+        document.body.classList.remove('no-scroll');
+        var form = overlay.querySelector('form');
+        if (form && typeof form.reset === 'function') form.reset();
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.visible').forEach(function(m) { m.classList.remove('visible'); });
+            document.body.classList.remove('no-scroll');
+        }
+    });
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>

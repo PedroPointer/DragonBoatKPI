@@ -1,5 +1,28 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Configuración — Dragon Boat Analyzer{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="/">📊 Dashboard</a>
+    <span class="separator">/</span>
+    {% if section == "main" %}
+        <span class="current">⚙️ Configuración</span>
+    {% else %}
+        <a href="/config">⚙️ Configuración</a>
+        <span class="separator">/</span>
+        {% if section == "barcos" %}
+            <span class="current">🚤 Barcos</span>
+        {% elif section == "categorias" %}
+            <span class="current">🏷️ Categorías</span>
+        {% elif section == "tipos" %}
+            <span class="current">🧪 Tipos</span>
+        {% elif section == "telegram" %}
+            <span class="current">🤖 Telegram</span>
+        {% endif %}
+    {% endif %}
+</nav>
+{% endblock %}
+
 {% block content %}
 <h1>Configuración</h1>
 
@@ -11,28 +34,28 @@
                 <div class="config-name">🚤 Gestión de barcos</div>
                 <div class="config-meta">Crear, editar o eliminar embarcaciones</div>
             </div>
-            <span style="color: #38bdf8;">→</span>
+            <span style="color: var(--color-primary); font-weight: bold; font-size: 1.1rem;">→</span>
         </li>
         <li onclick="window.location='/config/categorias'" style="cursor: pointer;">
             <div>
                 <div class="config-name">🏷️ Categorías</div>
                 <div class="config-meta">Gestionar categorías de competición</div>
             </div>
-            <span style="color: #38bdf8;">→</span>
+            <span style="color: var(--color-primary); font-weight: bold; font-size: 1.1rem;">→</span>
         </li>
         <li onclick="window.location='/config/tipos'" style="cursor: pointer;">
             <div>
                 <div class="config-name">🧪 Tipos de prueba</div>
                 <div class="config-meta">Gestionar tipos (entreno, competicion…)</div>
             </div>
-            <span style="color: #38bdf8;">→</span>
+            <span style="color: var(--color-primary); font-weight: bold; font-size: 1.1rem;">→</span>
         </li>
         <li onclick="window.location='/config/telegram'" style="cursor: pointer;">
             <div>
                 <div class="config-name">🤖 Telegram Bot</div>
                 <div class="config-meta">Configurar notificaciones por Telegram</div>
             </div>
-            <span style="color: #38bdf8;">→</span>
+            <span style="color: var(--color-primary); font-weight: bold; font-size: 1.1rem;">→</span>
         </li>
     </ul>
 </div>
@@ -42,34 +65,12 @@
 <h2 style="margin-bottom: 1rem;">Gestión de barcos</h2>
 
 <div class="card">
-    <h2>Añadir barco</h2>
-    <form action="/config/barcos" method="post">
-        <div class="form-row">
-            <div class="field">
-                <label>Nombre</label>
-                <input type="text" name="name" required placeholder="Ej: DB12" style="width: 100px;">
-            </div>
-            <div class="field">
-                <label>Nombre display</label>
-                <input type="text" name="display_name" required placeholder="Ej: Dragon Boat 12">
-            </div>
-            <div class="field">
-                <label>Filas</label>
-                <input type="number" name="num_rows" required value="5" style="width: 80px;">
-            </div>
-            <div class="field">
-                <label>Personas</label>
-                <input type="number" name="total_persons" required value="12" style="width: 80px;">
-            </div>
-            <button type="submit" class="btn">Añadir</button>
-        </div>
-    </form>
-</div>
-
-<div class="card">
-    <h2>Barcos ({{ boats|length }})</h2>
+    <div class="card-header-with-action">
+        <h2>Barcos ({{ boats|length }})</h2>
+        <button type="button" class="btn btn-secondary small" onclick="openModal('modal-barco')">Añadir +</button>
+    </div>
     {% if boats %}
-    <div class="table-wrapper">
+    <div class="table-wrapper table-cards-on-mobile">
     <table>
         <thead>
             <tr>
@@ -77,17 +78,17 @@
                 <th>Display</th>
                 <th>Filas</th>
                 <th>Personas</th>
-                <th></th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for b in boats %}
             <tr>
-                <td><strong>{{ b.name }}</strong></td>
-                <td>{{ b.display_name }}</td>
-                <td>{{ b.num_rows }}</td>
-                <td>{{ b.total_persons }}</td>
-                <td>
+                <td data-label="Nombre"><strong>{{ b.name }}</strong></td>
+                <td data-label="Display">{{ b.display_name }}</td>
+                <td data-label="Filas">{{ b.num_rows }}</td>
+                <td data-label="Personas">{{ b.total_persons }}</td>
+                <td data-label="Acciones">
                     <form action="/config/barcos/{{ b.id }}/delete" method="post" style="display: inline;"
                           onsubmit="return confirm('Eliminar {{ b.name }}?')">
                         <button type="submit" class="btn small danger">Eliminar</button>
@@ -98,7 +99,48 @@
         </tbody>
     </table>
     </div>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon">🚤</span>
+        <h3>Sin barcos</h3>
+        <p>Añade el primer barco para empezar</p>
+    </div>
     {% endif %}
+</div>
+
+<div class="modal-overlay" id="modal-barco" onclick="if(event.target===this) closeModal('modal-barco')">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Añadir barco</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modal-barco')" aria-label="Cerrar">×</button>
+        </div>
+        <form action="/config/barcos" method="post">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Nombre</label>
+                        <input type="text" name="name" required placeholder="Ej: DB12">
+                    </div>
+                    <div class="field">
+                        <label>Nombre display</label>
+                        <input type="text" name="display_name" required placeholder="Ej: Dragon Boat 12">
+                    </div>
+                    <div class="field">
+                        <label>Filas</label>
+                        <input type="number" name="num_rows" required value="5">
+                    </div>
+                    <div class="field">
+                        <label>Personas</label>
+                        <input type="number" name="total_persons" required value="12">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('modal-barco')">Descartar cambios</button>
+                <button type="submit" class="btn">Guardar</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 {% elif section == "categorias" %}
@@ -106,35 +148,26 @@
 <h2 style="margin-bottom: 1rem;">Categorías</h2>
 
 <div class="card">
-    <h2>Añadir categoría</h2>
-    <form action="/config/categorias" method="post">
-        <div class="form-row">
-            <div class="field">
-                <label>Nombre</label>
-                <input type="text" name="name" required placeholder="Ej: Open Sénior">
-            </div>
-            <button type="submit" class="btn">Añadir</button>
-        </div>
-    </form>
-</div>
-
-<div class="card">
-    <h2>Categorías ({{ categories|length }})</h2>
+    <div class="card-header-with-action">
+        <h2>Categorías ({{ categories|length }})</h2>
+        <button type="button" class="btn btn-secondary small" onclick="openModal('modal-categoria')">Añadir +</button>
+    </div>
     {% if categories %}
+    <div class="table-wrapper table-cards-on-mobile">
     <table>
         <thead>
             <tr>
                 <th>Nombre</th>
-                <th></th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for cat in categories %}
             <tr>
-                <td><strong>{{ cat.name }}</strong></td>
-                <td>
-                    <form action="/config/categorias/{{ cat.id }}/edit" method="post" style="display: inline-flex; gap: 0.5rem; align-items: center;">
-                        <input type="text" name="name" value="{{ cat.name }}" required style="background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 180px;">
+                <td data-label="Nombre"><strong>{{ cat.name }}</strong></td>
+                <td data-label="Acciones">
+                    <form action="/config/categorias/{{ cat.id }}/edit" method="post" style="display: inline-flex; gap: 0.5rem; align-items: center; width: 100%; max-width: 320px; margin-bottom: 0.5rem;">
+                        <input type="text" name="name" value="{{ cat.name }}" required style="background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.40rem 0.6rem; font-size: 0.85rem; flex-grow: 1; min-height: auto;">
                         <button type="submit" class="btn small">Guardar</button>
                     </form>
                     <form action="/config/categorias/{{ cat.id }}/delete" method="post" style="display: inline;"
@@ -146,7 +179,37 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon">🏷️</span>
+        <h3>Sin categorías</h3>
+        <p>Añade la primera categoría de competición</p>
+    </div>
     {% endif %}
+</div>
+
+<div class="modal-overlay" id="modal-categoria" onclick="if(event.target===this) closeModal('modal-categoria')">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Añadir categoría</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modal-categoria')" aria-label="Cerrar">×</button>
+        </div>
+        <form action="/config/categorias" method="post">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Nombre</label>
+                        <input type="text" name="name" required placeholder="Ej: Open Sénior">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('modal-categoria')">Descartar cambios</button>
+                <button type="submit" class="btn">Guardar</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 {% elif section == "tipos" %}
@@ -154,35 +217,26 @@
 <h2 style="margin-bottom: 1rem;">Tipos de prueba</h2>
 
 <div class="card">
-    <h2>Añadir tipo</h2>
-    <form action="/config/tipos" method="post">
-        <div class="form-row">
-            <div class="field">
-                <label>Nombre</label>
-                <input type="text" name="name" required placeholder="Ej: entreno">
-            </div>
-            <button type="submit" class="btn">Añadir</button>
-        </div>
-    </form>
-</div>
-
-<div class="card">
-    <h2>Tipos ({{ test_types|length }})</h2>
+    <div class="card-header-with-action">
+        <h2>Tipos ({{ test_types|length }})</h2>
+        <button type="button" class="btn btn-secondary small" onclick="openModal('modal-tipo')">Añadir +</button>
+    </div>
     {% if test_types %}
+    <div class="table-wrapper table-cards-on-mobile">
     <table>
         <thead>
             <tr>
                 <th>Nombre</th>
-                <th></th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for t in test_types %}
             <tr>
-                <td><strong>{{ t.name }}</strong></td>
-                <td>
-                    <form action="/config/tipos/{{ t.id }}/edit" method="post" style="display: inline-flex; gap: 0.5rem; align-items: center;">
-                        <input type="text" name="name" value="{{ t.name }}" required style="background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 180px;">
+                <td data-label="Nombre"><strong>{{ t.name }}</strong></td>
+                <td data-label="Acciones">
+                    <form action="/config/tipos/{{ t.id }}/edit" method="post" style="display: inline-flex; gap: 0.5rem; align-items: center; width: 100%; max-width: 320px; margin-bottom: 0.5rem;">
+                        <input type="text" name="name" value="{{ t.name }}" required style="background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.40rem 0.6rem; font-size: 0.85rem; flex-grow: 1; min-height: auto;">
                         <button type="submit" class="btn small">Guardar</button>
                     </form>
                     <form action="/config/tipos/{{ t.id }}/delete" method="post" style="display: inline;"
@@ -194,7 +248,37 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon">🧪</span>
+        <h3>Sin tipos</h3>
+        <p>Añade el primer tipo de prueba (ej: entreno, competicion)</p>
+    </div>
     {% endif %}
+</div>
+
+<div class="modal-overlay" id="modal-tipo" onclick="if(event.target===this) closeModal('modal-tipo')">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Añadir tipo de prueba</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modal-tipo')" aria-label="Cerrar">×</button>
+        </div>
+        <form action="/config/tipos" method="post">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Nombre</label>
+                        <input type="text" name="name" required placeholder="Ej: entreno">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('modal-tipo')">Descartar cambios</button>
+                <button type="submit" class="btn">Guardar</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 {% elif section == "telegram" %}
@@ -205,24 +289,24 @@
     <h2>Configuración de notificaciones</h2>
     <form>
         <div class="form-row">
-            <div class="field">
+            <div class="field" style="min-width: 120px;">
                 <label>Habilitado</label>
                 <select name="enabled">
                     <option value="no">No</option>
                     <option value="si">Sí</option>
                 </select>
             </div>
-            <div class="field">
+            <div class="field" style="min-width: 200px; max-width: 100%;">
                 <label>Token del bot</label>
-                <input type="password" name="token" placeholder="Introduce el token de Telegram" style="width: 300px;">
+                <input type="password" name="token" placeholder="Introduce el token de Telegram">
             </div>
-            <div class="field">
+            <div class="field" style="min-width: 150px; max-width: 100%;">
                 <label>Chat ID</label>
-                <input type="text" name="chat_id" placeholder="ID del chat de Telegram" style="width: 200px;">
+                <input type="text" name="chat_id" placeholder="ID del chat de Telegram">
             </div>
-            <button type="submit" class="btn" disabled>Guardar (próximamente)</button>
+            <button type="submit" class="btn" disabled style="flex-grow: 0;">Guardar (próximamente)</button>
         </div>
-        <p style="color: #64748b; font-size: 0.8rem; margin-top: 1rem;">
+        <p style="color: var(--color-text-secondary); font-size: 0.85rem; margin-top: 1.25rem; line-height: 1.4;">
             La configuración del bot de Telegram se integrará próximamente.
             Por ahora, las notificaciones se muestran por consola.
         </p>

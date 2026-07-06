@@ -1,42 +1,24 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Deportistas — Dragon Boat Analyzer{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="/">📊 Dashboard</a>
+    <span class="separator">/</span>
+    <span class="current">👥 Deportistas</span>
+</nav>
+{% endblock %}
+
 {% block content %}
 <h1>Deportistas</h1>
 
 <div class="card">
-    <h2>Añadir deportista</h2>
-    <form action="/deportistas/add" method="post" enctype="multipart/form-data">
-        <div class="form-row">
-            <div class="field">
-                <label>Nombre</label>
-                <input type="text" name="nombre" required placeholder="Nombre">
-            </div>
-            <div class="field">
-                <label>Apellido</label>
-                <input type="text" name="apellido" required placeholder="Apellido">
-            </div>
-            <div class="field">
-                <label>Categoría</label>
-                <select name="categoria">
-                    <option value="">— Seleccionar —</option>
-                    {% for cat in categories %}
-                    <option value="{{ cat.name }}">{{ cat.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="field">
-                <label>Foto</label>
-                <input type="file" name="photo" accept="image/*">
-            </div>
-            <button type="submit" class="btn">Añadir</button>
-        </div>
-    </form>
-</div>
-
-<div class="card">
-    <h2>Tripulantes ({{ crew|length }})</h2>
+    <div class="card-header-with-action">
+        <h2>Tripulantes ({{ crew|length }})</h2>
+        <button type="button" class="btn btn-secondary small" onclick="openModal('modal-deportista')">Añadir +</button>
+    </div>
     {% if crew %}
-    <div class="table-wrapper">
+    <div class="table-wrapper table-cards-on-mobile">
     <table>
         <thead>
             <tr>
@@ -44,25 +26,25 @@
                 <th>Nombre</th>
                 <th>Apellido</th>
                 <th>Categoría</th>
-                <th></th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for cm in crew %}
             <tr>
-                <td>
+                <td data-label="Foto">
                     {% if cm.photo_path %}
                     <img src="/photos/{{ cm.photo_path }}" alt="" class="photo-circle">
                     {% else %}
                     <div class="photo-placeholder">{{ cm.nombre[0] }}{{ cm.apellido[0] }}</div>
                     {% endif %}
                 </td>
-                <td class="edit-inline" onclick="toggleEdit({{ cm.id }})">{{ cm.nombre }}</td>
-                <td class="edit-inline" onclick="toggleEdit({{ cm.id }})">{{ cm.apellido }}</td>
-                <td>
+                <td data-label="Nombre" class="edit-inline" onclick="toggleEdit({{ cm.id }})">{{ cm.nombre }}</td>
+                <td data-label="Apellido" class="edit-inline" onclick="toggleEdit({{ cm.id }})">{{ cm.apellido }}</td>
+                <td data-label="Categoría">
                     {% if cm.categoria %}<span class="badge">{{ cm.categoria }}</span>{% else %}<span style="color: #475569;">—</span>{% endif %}
                 </td>
-                <td>
+                <td data-label="Acciones">
                     <button class="btn small btn-secondary" onclick="toggleEdit({{ cm.id }})">Editar</button>
                     <form action="/deportistas/{{ cm.id }}/delete" method="post" style="display: inline;"
                           onsubmit="return confirm('Eliminar {{ cm.nombre }} {{ cm.apellido }}?')">
@@ -104,7 +86,11 @@
     </table>
     </div>
     {% else %}
-    <p style="color: #64748b; text-align: center;">No hay deportistas registrados.</p>
+    <div class="empty-state">
+        <span class="empty-icon">👥</span>
+        <h3>Aún no hay tripulantes</h3>
+        <p>Añade deportistas con el botón de arriba o importa un CSV</p>
+    </div>
     {% endif %}
 </div>
 
@@ -122,6 +108,46 @@
             Formato: columnas <code>nombre</code>, <code>apellido</code>, <code>categoria</code> (opcional)
         </p>
     </form>
+</div>
+
+<div class="modal-overlay" id="modal-deportista" onclick="if(event.target===this) closeModal('modal-deportista')">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Añadir deportista</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modal-deportista')" aria-label="Cerrar">×</button>
+        </div>
+        <form action="/deportistas/add" method="post" enctype="multipart/form-data">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Nombre</label>
+                        <input type="text" name="nombre" required placeholder="Nombre">
+                    </div>
+                    <div class="field">
+                        <label>Apellido</label>
+                        <input type="text" name="apellido" required placeholder="Apellido">
+                    </div>
+                    <div class="field">
+                        <label>Categoría</label>
+                        <select name="categoria">
+                            <option value="">— Seleccionar —</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.name }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Foto</label>
+                        <input type="file" name="photo" accept="image/*">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('modal-deportista')">Descartar cambios</button>
+                <button type="submit" class="btn">Guardar</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <script>

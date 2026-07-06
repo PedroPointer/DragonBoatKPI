@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}{{ test.custom_name or "Prueba #" ~ test.test_number }} — Dragon Boat Analyzer{% endblock %}
 {% block extra_head %}
 <style>
@@ -95,8 +95,17 @@
 </style>
 {% endblock %}
 
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="/">📊 Dashboard</a>
+    <span class="separator">/</span>
+    <a href="/registros">📋 Registros</a>
+    <span class="separator">/</span>
+    <span class="current">{% if test.custom_name %}{{ test.custom_name }}{% else %}Prueba #{{ test.test_number }}{% endif %}</span>
+</nav>
+{% endblock %}
+
 {% block content %}
-<a href="/registros" class="back-link">← Volver a registros</a>
 <h1>{% if test.custom_name %}{{ test.custom_name }}{% else %}Prueba #{{ test.test_number }}{% endif %}</h1>
 <p class="page-meta">
     {% if test.boat %}{{ test.boat.display_name }}{% endif %}
@@ -234,7 +243,7 @@
 <div class="card">
     <h2>Datos generales</h2>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
         <div>
             <h3 style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Tramos</h3>
             <table>
@@ -862,15 +871,11 @@ function toggleMapa() {
             body: JSON.stringify({assignments: payload})
         }).then(function(r) {
             if (r.ok) {
-                var msg = document.createElement('div');
-                msg.textContent = '✓ Guardado';
-                msg.style.cssText = 'position:fixed;top:20px;right:20px;background:#16a34a;color:white;padding:8px 16px;border-radius:6px;z-index:99999;font-size:0.85rem;';
-                document.body.appendChild(msg);
-                setTimeout(function() { msg.remove(); }, 2000);
+                showToast('✓ Guardado');
             } else {
-                alert('Error al guardar');
+                showToast('Error al guardar', 'error');
             }
-        }).catch(function() { alert('Error de conexión'); });
+        }).catch(function() { showToast('Error de conexión', 'error'); });
     };
 
     // Clear all
