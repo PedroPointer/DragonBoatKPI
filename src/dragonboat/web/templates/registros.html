@@ -163,7 +163,7 @@
 
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="/">📊 Dashboard</a>
+    <a href="/">🏠 Home</a>
     <span class="separator">/</span>
     <span class="current">📋 Registros</span>
 </nav>
@@ -194,7 +194,7 @@
         </div>
     </div>
 
-    <div class="table-wrapper table-cards-on-mobile">
+    <div class="table-mobile-scroll">
     <table id="tabla-registros" class="display" style="width:100%; color: #e2e8f0;">
         <thead>
             <tr>
@@ -212,15 +212,15 @@
         <tbody>
             {% for r in rows %}
             <tr class="row-link" onclick="window.location='/test/{{ r.prueba_id }}'">
-                <td data-label="#">{{ r.numero }}</td>
-                <td data-label="Nombre">{{ r.nombre or "—" }}</td>
-                <td data-label="Tipo">{% if r.tipo %}<span class="badge {% if r.tipo == 'competición' %}badge-info{% endif %}">{{ r.tipo }}</span>{% else %}—{% endif %}</td>
-                <td data-label="Barco">{% if r.barco %}<span class="badge {% if r.barco == 'DB12' %}db12{% elif r.barco == 'DB22' %}db22{% endif %}">{{ r.barco }}</span>{% else %}—{% endif %}</td>
-                <td data-label="Tiempo (s)">{% if r.tiempo != None %}{{ "%.2f"|format(r.tiempo) }}{% else %}—{% endif %}</td>
-                <td data-label="Categoría">{% if r.categoria %}<span class="badge">{{ r.categoria }}</span>{% else %}—{% endif %}</td>
-                <td data-label="Fecha">{{ r.fecha.strftime("%d/%m/%Y") if r.fecha else "—" }}</td>
-                <td data-label="Hora">{{ r.hora }}</td>
-                <td data-label="Eliminar">
+                <td>{{ r.numero }}</td>
+                <td>{{ r.nombre or "—" }}</td>
+                <td>{% if r.tipo %}<span class="badge {% if r.tipo == 'competición' %}badge-info{% endif %}">{{ r.tipo }}</span>{% else %}—{% endif %}</td>
+                <td>{% if r.barco %}<span class="badge {% if r.barco == 'DB12' %}db12{% elif r.barco == 'DB22' %}db22{% endif %}">{{ r.barco }}</span>{% else %}—{% endif %}</td>
+                <td>{% if r.tiempo != None %}{{ "%.2f"|format(r.tiempo) }}{% else %}—{% endif %}</td>
+                <td>{% if r.categoria %}<span class="badge">{{ r.categoria }}</span>{% else %}—{% endif %}</td>
+                <td>{{ r.fecha.strftime("%d/%m/%Y") if r.fecha else "—" }}</td>
+                <td>{{ r.hora }}</td>
+                <td>
                     <form action="/registros/{{ r.prueba_id }}/delete" method="post"
                           style="display: inline;"
                           onclick="event.stopPropagation()"

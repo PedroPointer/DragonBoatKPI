@@ -1,50 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — Dragon Boat Analyzer{% endblock %}
+{% block title %}Home — Dragon Boat Analyzer{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <span class="current">📊 Dashboard</span>
+    <span class="current">🏠 Home</span>
 </nav>
 {% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
+<h1>Home</h1>
 
 {% if boat_stats %}
 <div class="card">
     <h2>Estadísticas por barco</h2>
     {% for stat in boat_stats %}
     <div style="margin-bottom: 1.5rem;">
-        <h3 style="color: #e2e8f0; margin-bottom: 0.75rem; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <h3 class="boat-section-title">
             <span class="badge {% if stat.name == 'DB12' %}db12{% else %}db22{% endif %}">{{ stat.name }}</span>
             {{ stat.display_name }}
         </h3>
         <div class="stats-grid">
-            <div class="stat-card">
+            <div class="stat-card stat-card-featured">
                 <div class="label">Mejor tiempo</div>
                 <div class="value gold">{{ stat.best_tiempo }}</div>
-                <div class="sub">segundos</div>
+                <div class="sub">s · {{ stat.best_tiempo_paladas or '—' }} paladas</div>
+                <div class="sub-meta">vel. máx {{ "%.2f"|format(stat.best_tiempo_vel_max) if stat.best_tiempo_vel_max else '—' }} km/h</div>
+                <div class="sub-meta">0→12 km/h en {{ "%.2f"|format(stat.best_tiempo_t12) if stat.best_tiempo_t12 else '—' }}s</div>
             </div>
             <div class="stat-card">
                 <div class="label">Pruebas</div>
                 <div class="value">{{ stat.num_tests }}</div>
             </div>
             <div class="stat-card">
-                <div class="label">Tiempo promedio</div>
-                <div class="value">{{ stat.avg_tiempo }}</div>
-                <div class="sub">s</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Velocidad media</div>
-                <div class="value">{{ stat.avg_velocidad }}</div>
-                <div class="sub">km/h</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Paladas promedio</div>
-                <div class="value">{{ stat.avg_paladas }}</div>
-            </div>
-            <div class="stat-card">
                 <div class="label">Dist. palada</div>
                 <div class="value">{{ stat.avg_dist_palada }}</div>
-                <div class="sub">m</div>
+                <div class="sub">m (media)</div>
             </div>
         </div>
     </div>
@@ -64,7 +52,7 @@
 {% if ranking %}
 <div class="card">
     <h2>Ranking de tiempos (Top 20)</h2>
-    <div class="table-wrapper table-cards-on-mobile">
+    <div class="table-mobile-scroll">
     <table>
         <thead>
             <tr>
@@ -82,15 +70,15 @@
         <tbody>
             {% for r in ranking %}
             <tr class="row-link" onclick="window.location='/test/{{ r.sesion_id }}'">
-                <td data-label="#"><span class="rank {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% endif %}">{{ loop.index }}</span></td>
-                <td data-label="Nombre"><strong>{{ r.custom_name or "—" }}</strong></td>
-                <td data-label="Barco"><span class="badge {% if r.boat_name == 'DB12' %}db12{% elif r.boat_name == 'DB22' %}db22{% endif %}">{{ r.boat_name or "—" }}</span></td>
-                <td data-label="Categoría">{{ r.categoria or "—" }}</td>
-                <td data-label="Tiempo"><span class="badge info">{{ "%.2f"|format(r.tiempo_total) }}s</span></td>
-                <td data-label="Vel. media">{{ "%.2f"|format(r.velocidad_media) }}</td>
-                <td data-label="Paladas">{{ r.num_paladas }}</td>
-                <td data-label="Dist. palada">{{ "%.2f"|format(r.dist_media_palada) }}m</td>
-                <td data-label="Fecha" style="color: #64748b; font-size: 0.8rem;">{{ r.fecha.strftime("%d/%m/%y") if r.fecha else '' }}</td>
+                <td><span class="rank {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% endif %}">{{ loop.index }}</span></td>
+                <td><strong>{{ r.custom_name or "—" }}</strong></td>
+                <td><span class="badge {% if r.boat_name == 'DB12' %}db12{% elif r.boat_name == 'DB22' %}db22{% endif %}">{{ r.boat_name or "—" }}</span></td>
+                <td>{{ r.categoria or "—" }}</td>
+                <td><span class="badge info">{{ "%.2f"|format(r.tiempo_total) }}s</span></td>
+                <td>{{ "%.2f"|format(r.velocidad_media) }}</td>
+                <td>{{ r.num_paladas }}</td>
+                <td>{{ "%.2f"|format(r.dist_media_palada) }}m</td>
+                <td style="color: #64748b; font-size: 0.8rem;">{{ r.fecha.strftime("%d/%m/%y") if r.fecha else '' }}</td>
             </tr>
             {% endfor %}
         </tbody>

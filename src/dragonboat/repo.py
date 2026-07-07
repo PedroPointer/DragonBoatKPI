@@ -300,39 +300,68 @@ def get_ranking(
 
 
 def get_boat_stats() -> list[dict]:
-    """Aggregate stats per boat type."""
+    """Aggregate stats per boat type: best time, count, avg distance, plus best-test metrics."""
     with get_session() as s:
         results = (
             s.query(
+                Boat.id.label("boat_id"),
                 Boat.name,
                 Boat.display_name,
                 func.count(TestMetric.id).label("num_tests"),
-                func.avg(TestMetric.tiempo_total).label("avg_tiempo"),
                 func.min(TestMetric.tiempo_total).label("best_tiempo"),
-                func.max(TestMetric.tiempo_total).label("worst_tiempo"),
-                func.avg(TestMetric.velocidad_media).label("avg_velocidad"),
-                func.avg(TestMetric.num_paladas).label("avg_paladas"),
                 func.avg(TestMetric.dist_media_palada).label("avg_dist_palada"),
             )
             .join(Sesion, TestMetric.sesion_id == Sesion.id)
             .join(Boat, Sesion.boat_id == Boat.id)
-            .group_by(Boat.name)
+            .group_by(Boat.id, Boat.name, Boat.display_name)
             .all()
         )
+
+        # For each boat, fetch metrics of the best (fastest) test
+        best_metrics = get_boat_best_metrics()
+
         return [
             {
                 "name": r.name,
                 "display_name": r.display_name,
                 "num_tests": r.num_tests,
-                "avg_tiempo": round(r.avg_tiempo, 2) if r.avg_tiempo else 0,
                 "best_tiempo": round(r.best_tiempo, 2) if r.best_tiempo else 0,
-                "worst_tiempo": round(r.worst_tiempo, 2) if r.worst_tiempo else 0,
-                "avg_velocidad": round(r.avg_velocidad, 2) if r.avg_velocidad else 0,
-                "avg_paladas": round(r.avg_paladas, 1) if r.avg_paladas else 0,
                 "avg_dist_palada": round(r.avg_dist_palada, 2) if r.avg_dist_palada else 0,
+                "best_tiempo_paladas": best_metrics.get(r.boat_id, {}).get("paladas"),
+                "best_tiempo_vel_max": best_metrics.get(r.boat_id, {}).get("vel_max"),
+                "best_tiempo_t12": best_metrics.get(r.boat_id, {}).get("t12"),
             }
             for r in results
         ]
+
+
+def get_boat_best_metrics() -> dict[int, dict]:
+    """For each boat_id, return metrics of the fastest test:
+    {boat_id: {paladas, vel_max, t12}}.
+    """
+    with get_session() as s:
+        rows = (
+            s.query(
+                Sesion.boat_id,
+                TestMetric.num_paladas,
+                TestMetric.velocidad_maxima,
+                TestMetric.tiempo_12kmh,
+                TestMetric.tiempo_total,
+            )
+            .join(Sesion, TestMetric.sesion_id == Sesion.id)
+            .filter(Sesion.boat_id.isnot(None))
+            .order_by(Sesion.boat_id, TestMetric.tiempo_total)
+            .all()
+        )
+    result: dict[int, dict] = {}
+    for boat_id, paladas, vel_max, t12, _t in rows:
+        if boat_id not in result:
+            result[boat_id] = {
+                "paladas": paladas,
+                "vel_max": vel_max,
+                "t12": t12,
+            }
+    return result
 
 
 # ── TestGpsData ──

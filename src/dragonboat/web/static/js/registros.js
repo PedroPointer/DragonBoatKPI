@@ -2,6 +2,8 @@ $(document).ready(function() {
     var table = $("#tabla-registros").DataTable({
         order: [[6, "desc"], [0, "asc"]],
         pageLength: 50,
+        scrollX: true,
+        autoWidth: false,
         language: {
             url: "//cdn.datatables.net/plug-ins/1.13.11/i18n/es-ES.json"
         },

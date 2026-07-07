@@ -1,4 +1,4 @@
-"""Web routes — dashboard, registros, informes, config."""
+"""Web routes — home, registros, informes, config."""
 
 from __future__ import annotations
 
@@ -70,10 +70,10 @@ CATEGORIAS = [
 ]
 
 
-# ── Dashboard (Home) ──
+# ── Home ──
 
 @router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def home(request: Request):
     ranking = get_ranking(limit=20)
     boat_stats = get_boat_stats()
     sesiones = get_sesiones(50)
@@ -96,13 +96,13 @@ async def dashboard(request: Request):
             incomplete.append({"sesion": s, "warnings": warns})
 
     return templates.TemplateResponse(
-        name="dashboard.html",
+        name="home.html",
         request=request,
         context={
             "ranking": ranking,
             "boat_stats": boat_stats,
             "incomplete": incomplete,
-            "active_nav": "dashboard",
+            "active_nav": "home",
         },
     )
 

@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="/">📊 Dashboard</a>
+    <a href="/">🏠 Home</a>
     <span class="separator">/</span>
     <span class="current">👥 Deportistas</span>
 </nav>
@@ -18,7 +18,7 @@
         <button type="button" class="btn btn-secondary small" onclick="openModal('modal-deportista')">Añadir +</button>
     </div>
     {% if crew %}
-    <div class="table-wrapper table-cards-on-mobile">
+    <div class="table-mobile-scroll">
     <table>
         <thead>
             <tr>
@@ -32,52 +32,23 @@
         <tbody>
             {% for cm in crew %}
             <tr>
-                <td data-label="Foto">
+                <td>
                     {% if cm.photo_path %}
                     <img src="/photos/{{ cm.photo_path }}" alt="" class="photo-circle">
                     {% else %}
                     <div class="photo-placeholder">{{ cm.nombre[0] }}{{ cm.apellido[0] }}</div>
                     {% endif %}
                 </td>
-                <td data-label="Nombre" class="edit-inline" onclick="toggleEdit({{ cm.id }})">{{ cm.nombre }}</td>
-                <td data-label="Apellido" class="edit-inline" onclick="toggleEdit({{ cm.id }})">{{ cm.apellido }}</td>
-                <td data-label="Categoría">
+                <td><strong>{{ cm.nombre }}</strong></td>
+                <td>{{ cm.apellido }}</td>
+                <td>
                     {% if cm.categoria %}<span class="badge">{{ cm.categoria }}</span>{% else %}<span style="color: #475569;">—</span>{% endif %}
                 </td>
-                <td data-label="Acciones">
-                    <button class="btn small btn-secondary" onclick="toggleEdit({{ cm.id }})">Editar</button>
+                <td>
+                    <button class="btn small btn-secondary" onclick="openEditDeportista({{ cm.id }}, {{ cm.nombre|tojson }}, {{ cm.apellido|tojson }}, {{ cm.categoria|tojson }})">Editar</button>
                     <form action="/deportistas/{{ cm.id }}/delete" method="post" style="display: inline;"
                           onsubmit="return confirm('Eliminar {{ cm.nombre }} {{ cm.apellido }}?')">
                         <button type="submit" class="btn small danger">Eliminar</button>
-                    </form>
-                </td>
-            </tr>
-            <tr id="edit-row-{{ cm.id }}" class="edit-form">
-                <td colspan="5">
-                    <form action="/deportistas/{{ cm.id }}/edit" method="post" enctype="multipart/form-data" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                        <div class="field">
-                            <label>Nombre</label>
-                            <input type="text" name="nombre" value="{{ cm.nombre }}" required>
-                        </div>
-                        <div class="field">
-                            <label>Apellido</label>
-                            <input type="text" name="apellido" value="{{ cm.apellido }}" required>
-                        </div>
-                        <div class="field">
-                            <label>Categoría</label>
-                            <select name="categoria">
-                                <option value="">— Sin categoría —</option>
-                                {% for cat in categories %}
-                                <option value="{{ cat.name }}" {% if cm.categoria == cat.name %}selected{% endif %}>{{ cat.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Foto</label>
-                            <input type="file" name="photo" accept="image/*">
-                        </div>
-                        <button type="submit" class="btn small">Guardar</button>
-                        <button type="button" class="btn small btn-secondary" onclick="toggleEdit({{ cm.id }})">Cancelar</button>
                     </form>
                 </td>
             </tr>
@@ -150,12 +121,62 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="modal-editar-deportista" onclick="if(event.target===this) closeModal('modal-editar-deportista')">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Editar tripulante</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modal-editar-deportista')" aria-label="Cerrar">×</button>
+        </div>
+        <form id="form-editar-deportista" method="post" enctype="multipart/form-data">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Nombre</label>
+                        <input type="text" name="nombre" required>
+                    </div>
+                    <div class="field">
+                        <label>Apellido</label>
+                        <input type="text" name="apellido" required>
+                    </div>
+                    <div class="field">
+                        <label>Categoría</label>
+                        <select name="categoria">
+                            <option value="">— Sin categoría —</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.name }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Foto (opcional — dejar vacío para conservar la actual)</label>
+                        <input type="file" name="photo" accept="image/*">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('modal-editar-deportista')">Descartar cambios</button>
+                <button type="submit" class="btn">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
-function toggleEdit(id) {
-    const rows = document.querySelectorAll('#edit-row-' + id);
-    rows.forEach(function(row) {
-        row.classList.toggle('visible');
-    });
+function openEditDeportista(id, nombre, apellido, categoria) {
+    var form = document.getElementById('form-editar-deportista');
+    form.action = '/deportistas/' + id + '/edit';
+    form.querySelector('[name=nombre]').value = nombre || '';
+    form.querySelector('[name=apellido]').value = apellido || '';
+    var select = form.querySelector('[name=categoria]');
+    var cat = categoria || '';
+    for (var i = 0; i < select.options.length; i++) {
+        if (select.options[i].value === cat) {
+            select.selectedIndex = i;
+            break;
+        }
+    }
+    form.querySelector('[name=photo]').value = '';
+    openModal('modal-editar-deportista');
 }
 </script>
 {% endblock %}
