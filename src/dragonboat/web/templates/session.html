@@ -35,12 +35,12 @@
 <div class="session-card">
     <div class="session-info">
         <h3>{% if t.custom_name %}{{ t.custom_name }}{% else %}Prueba #{{ t.test_number }}{% endif %}</h3>
-        <div style="color: #38bdf8; font-size: 1.5rem; font-weight: bold;">{{ "%.2f"|format(t.metric.tiempo_total) if t.metric else '—' }}s</div>
+        <div style="color: #38bdf8; font-size: 1.5rem; font-weight: bold;">{{ t.metric.tiempo_total|duration if t.metric else '—' }}</div>
         <p style="color: #64748b; font-size: 0.85rem;">
             {% if t.metric %}
-            {{ "%.2f"|format(t.metric.velocidad_media) }} km/h ·
+            {{ t.metric.velocidad_media|comma }} km/h ·
             {{ t.metric.num_paladas }} paladas ·
-            {{ "%.2f"|format(t.metric.dist_media_palada) }} m/pal
+            {{ t.metric.dist_media_palada|comma }} m/pal
             {% endif %}
         </p>
     </div>

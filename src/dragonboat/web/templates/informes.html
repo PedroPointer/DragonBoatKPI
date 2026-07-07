@@ -3,9 +3,9 @@
 
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="/">🏠 Home</a>
+    <a href="/"><img src="/static/img/home_24dp.svg" alt="" class="breadcrumb-icon"> Home</a>
     <span class="separator">/</span>
-    <span class="current">📄 Informes</span>
+    <span class="current"><img src="/static/img/swap_vert_24dp.svg" alt="" class="breadcrumb-icon"> Informes</span>
 </nav>
 {% endblock %}
 
@@ -19,6 +19,40 @@
 {% if message %}
 <div class="card" style="background: #166534; color: #86efac;">
     <p>{{ message }}</p>
+</div>
+{% endif %}
+
+{% if resumen %}
+<div class="card" style="border: 1px solid #2dd4bf; background: rgba(20, 83, 45, 0.25);">
+    <h2 style="color: #5eead4; margin-top: 0;">✓ Análisis completado</h2>
+    <p style="margin-bottom: 0.5rem;">CSV: <strong>{{ resumen.csv_filename }}</strong></p>
+    <div class="stats-grid">
+        {% for d in distancias_validas %}
+        <div class="stat-card">
+            <div class="label">{{ d }}m</div>
+            <div class="value" style="color: #5eead4; font-size: 1.5rem;">{{ resumen.conteo_distancias.get(d, 0) }}</div>
+            <div class="sub">prueba(s)</div>
+        </div>
+        {% endfor %}
+    </div>
+    <p style="margin-top: 1rem;">
+        Total: <strong style="color: #86efac;">{{ resumen.total_pruebas }}</strong> prueba(s)
+    </p>
+    {% if resumen.report_filename %}
+    <p>Informe generado: <strong style="font-family: Consolas, monospace;">{{ resumen.report_filename }}</strong></p>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem;">
+        <button type="button" class="btn" onclick="toggleReporte('{{ resumen.report_filename }}', 'reporteViewer')">Ver informe</button>
+        <a class="btn btn-secondary"
+           href="/informes/reporte/{{ resumen.report_filename }}/download"
+           download>Descargar informe</a>
+        {% if resumen.first_sesion_id %}
+        <a class="btn btn-secondary" href="/test/{{ resumen.first_sesion_id }}">Ir a la primera prueba →</a>
+        {% endif %}
+    </div>
+    <div id="reporteViewer" style="display: none; margin-top: 1rem;">
+        <pre style="white-space: pre-wrap; font-family: Consolas, monospace; color: #e2e8f0; background: #0f172a; padding: 1rem; border-radius: 8px; max-height: 600px; overflow-y: auto; font-size: 0.85rem; border: 1px solid #334155;" id="reporteContenido">Cargando...</pre>
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 
@@ -64,6 +98,83 @@
 </div>
 
 <hr style="border: none; border-top: 1px solid #334155; margin: 2rem 0;">
+
+{% if recent_uploads %}
+<div class="card">
+    <h2>Informes de subidas</h2>
+    <div class="table-mobile-scroll">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Archivo</th>
+                <th>Fecha</th>
+                <th>Pruebas</th>
+                <th style="width: 50px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in recent_uploads %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td style="word-break: break-all; max-width: 240px;">{{ u.filename }}</td>
+                <td style="white-space: nowrap;">{{ u.fecha_datos.strftime("%d/%m/%y %H:%M") if u.fecha_datos else '—' }}</td>
+                <td>
+                    <strong>{{ u.num_pruebas }}</strong>
+                    {% for d in distancias_validas %}
+                        {% set cnt = u.conteo_distancias.get(d, 0) %}
+                        {% if cnt > 0 %}
+                        <span class="badge info" style="margin-left: 0.25rem;">{{ d }}m: {{ cnt }}</span>
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td style="position: relative;">
+                    <button type="button" class="menu-dots" aria-label="Acciones"
+                            data-upload-id="{{ u.id }}"
+                            onclick="toggleMenuDots({{ u.id }})">⋮</button>
+                    <div id="menuDots_{{ u.id }}" class="menu-dots-dropdown">
+                        {% if u.report_exists %}
+                        <button type="button"
+                                onclick="toggleReporte('{{ u.report_filename }}', 'reporteViewer_{{ u.id }}')">
+                            Ver informe
+                        </button>
+                        <a href="/informes/reporte/{{ u.report_filename }}/download" download>
+                            Descargar informe
+                        </a>
+                        {% else %}
+                        <span class="menu-dots-empty">Informe no disponible</span>
+                        {% endif %}
+                        {% if u.first_sesion_id %}
+                        <a href="/test/{{ u.first_sesion_id }}">
+                            Ir a registro
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            <tr id="reporteViewer_{{ u.id }}_row" style="display: none;">
+                <td colspan="5" style="padding: 0.5rem 0.5rem 1rem 0.5rem;">
+                    <pre id="reporteViewer_{{ u.id }}Contenido"
+                         style="white-space: pre-wrap; font-family: Consolas, monospace; color: #e2e8f0;
+                                background: #0f172a; padding: 1rem; border-radius: 8px;
+                                max-height: 500px; overflow-y: auto; font-size: 0.8rem;
+                                border: 1px solid #334155; margin: 0;">Cargando...</pre>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <span class="empty-icon">🚤</span>
+        <h3>Aún no hay datos</h3>
+        <p>Sube un CSV desde Informes para ver estadísticas</p>
+    </div>
+</div>
+{% endif %}
 
 <div class="action-card" onclick="document.getElementById('generateForm').style.display='block'">
     <div class="action-icon">📋</div>
@@ -122,5 +233,59 @@
             if (this.files.length) { overwriteBtn.disabled = false; }
         });
     }
+
+    // ── Report viewer (Ver informe) ──
+    // Multiple viewers possible: the upload resumen card and each row of the
+    // "Informes de subidas" table expose a "Ver informe" button.
+    // Each viewer block has IDs `<viewerId>` (the tr wrapper) and
+    // `<viewerId>Contenido` (the <pre>).
+    const reportesCargados = {};
+    function toggleReporte(filename, viewerId) {
+        const viewer = document.getElementById(viewerId + '_row') || document.getElementById(viewerId);
+        const pre = document.getElementById(viewerId + 'Contenido');
+        if (!viewer || !pre) return;
+        if (viewer.style.display === 'none') {
+            viewer.style.display = '';
+            if (reportesCargados[viewerId] === filename) return;
+            pre.textContent = 'Cargando...';
+            fetch('/informes/reporte/' + encodeURIComponent(filename))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        pre.textContent = 'Error: ' + data.error;
+                    } else {
+                        pre.textContent = data.content;
+                        reportesCargados[viewerId] = filename;
+                    }
+                })
+                .catch(() => { pre.textContent = 'Error al cargar el informe'; });
+        } else {
+            viewer.style.display = 'none';
+        }
+    }
+
+    // ── 3-puntos dropdown menu (per row) ──
+    function toggleMenuDots(uploadId) {
+        const menu = document.getElementById('menuDots_' + uploadId);
+        if (!menu) return;
+
+        // Cerrar otros menús abiertos
+        const wasOpen = menu.classList.contains('open');
+        document.querySelectorAll('.menu-dots-dropdown.open').forEach(m => m.classList.remove('open'));
+        if (wasOpen) return;
+
+        menu.classList.add('open');
+    }
+    function closeAllMenus() {
+        document.querySelectorAll('.menu-dots-dropdown.open').forEach(m => m.classList.remove('open'));
+    }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.menu-dots') && !e.target.closest('.menu-dots-dropdown')) {
+            closeAllMenus();
+        }
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeAllMenus();
+    });
 </script>
 {% endblock %}

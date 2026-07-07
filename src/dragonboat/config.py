@@ -30,7 +30,22 @@ class Settings(BaseSettings):
 
     # ── Analysis constants ──
     bote_personas: int = 12
-    distancia_200m: float = 200.0
+    distancias_validas: list[int] = [200, 500, 1000, 2000]
+    tolerancia_distancia: dict[int, float] = {
+        200: 0.15,   # ±30m   -> [170, 230]
+        500: 0.10,   # ±50m   -> [450, 550]
+        1000: 0.05,  # ±50m   -> [950, 1050]
+        2000: 0.10,  # ±200m  -> [1800, 2200]
+    }
+    limite_tiempo_max: dict[int, float] = {
+        200: 85.0,
+        500: 240.0,
+        1000: 600.0,
+        2000: 1500.0,
+    }
+    umbral_velocidad_fin: float = 8.0            # km/h sostenidos para detectar fin
+    umbral_ventana_fin: int = 25                 # samples (1s @ 25Hz)
+    umbral_velocidad_instantanea_2000: float = 8.0   # km/h, mínimo en 2000m
 
     # Detection params
     min_speed_start: float = 8.0

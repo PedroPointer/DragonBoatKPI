@@ -15,7 +15,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from scipy.signal import find_peaks
 
-from dragonboat.analysis._utils import fmt
+from dragonboat.analysis._utils import fmt, format_duration
 from dragonboat.analysis.strokes import detectar_picos
 from dragonboat.config import settings
 from dragonboat.models import Metricas, PaladasInfo
@@ -69,7 +69,7 @@ def graficar_200m(
     ax4 = fig.add_subplot(gs[3], sharex=ax1)
 
     fig.suptitle(
-        f"200 Metros - {hora_str} - {fecha_str} - {m.tiempo_total:.2f}s",
+        f"{m.distancia} Metros - {hora_str} - {fecha_str} - {format_duration(m.tiempo_total)}",
         fontsize=14,
         fontweight="bold",
     )
@@ -115,7 +115,7 @@ def graficar_200m(
 
     if m.tiempo_150m is not None:
         ax1.annotate(
-            f"150m\n{m.tiempo_150m:.1f}s",
+            f"150m\n{format_duration(m.tiempo_150m)}",
             xy=(m.tiempo_150m, np.interp(m.tiempo_150m, rel_time, speed)),
             xytext=(m.tiempo_150m - 2, m.velocidad_maxima * 0.60),
             fontsize=8,
@@ -125,33 +125,55 @@ def graficar_200m(
             bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#f39c12", alpha=0.85),
         )
 
-    if m.tiempo_50m is not None:
+    # Intermediate markers (D/4, 2D/4, 3D/4) — secondary, in grey
+    keys = sorted(m.tiempos_por_distancia.keys(), key=lambda k: int(k))
+    if len(keys) >= 2:
+        # Show the second-to-last (penultimate) marker in orange
+        if m.distancia != 200 and len(keys) >= 2:
+            penult_key = keys[-2]
+            t_penult = m.tiempos_por_distancia[penult_key]
+            ax1.annotate(
+                f"{penult_key}m\n{format_duration(t_penult)}",
+                xy=(t_penult, np.interp(t_penult, rel_time, speed)),
+                xytext=(t_penult, m.velocidad_maxima * 0.60),
+                fontsize=8,
+                ha="center",
+                va="bottom",
+                color="#f39c12",
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#f39c12", alpha=0.85),
+            )
+        # First marker (D/4) in grey
+        first_key = keys[0]
+        t_first = m.tiempos_por_distancia[first_key]
         ax1.annotate(
-            f"50m\n{m.tiempo_50m:.1f}s",
-            xy=(m.tiempo_50m, np.interp(m.tiempo_50m, rel_time, speed)),
-            xytext=(m.tiempo_50m, m.velocidad_maxima * 0.45),
+            f"{first_key}m\n{format_duration(t_first)}",
+            xy=(t_first, np.interp(t_first, rel_time, speed)),
+            xytext=(t_first, m.velocidad_maxima * 0.45),
             fontsize=7,
             ha="center",
             color="#555",
             bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="#888", alpha=0.85),
         )
-    if m.tiempo_100m is not None:
-        ax1.annotate(
-            f"100m\n{m.tiempo_100m:.1f}s",
-            xy=(m.tiempo_100m, np.interp(m.tiempo_100m, rel_time, speed)),
-            xytext=(m.tiempo_100m, m.velocidad_maxima * 0.55),
-            fontsize=7,
-            ha="center",
-            color="#555",
-            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="#888", alpha=0.85),
-        )
+        # Second marker (D/2) in grey, only if distance >= 500
+        if len(keys) >= 3 and m.distancia >= 500:
+            mid_key = keys[1]
+            t_mid = m.tiempos_por_distancia[mid_key]
+            ax1.annotate(
+                f"{mid_key}m\n{format_duration(t_mid)}",
+                xy=(t_mid, np.interp(t_mid, rel_time, speed)),
+                xytext=(t_mid, m.velocidad_maxima * 0.55),
+                fontsize=7,
+                ha="center",
+                color="#555",
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="#888", alpha=0.85),
+            )
 
     if m.tiempo_12kmh is not None:
         ax1.axvspan(0, m.tiempo_12kmh, alpha=0.08, color="#f39c12", zorder=0)
         ax1.text(
             m.tiempo_12kmh / 2,
             m.velocidad_maxima * 0.92,
-            f"0-12 km/h: {m.tiempo_12kmh:.2f}s",
+            f"0-12 km/h: {format_duration(m.tiempo_12kmh)}",
             fontsize=9,
             ha="center",
             va="bottom",
@@ -169,14 +191,14 @@ def graficar_200m(
         "Vel. media:       {} km/h   \n"
         "0-12 km/h:        {}        \n"
         "Paladas totales:  {}        \n"
-        "Distancia Palada: {:.2f} m/pal\n"
+        "Distancia Palada: {} m/pal\n"
         "Consistencia(std): {} m     "
     ).format(
         fmt(m.velocidad_maxima, 1),
         fmt(m.velocidad_media, 2),
-        fmt(m.tiempo_12kmh),
+        format_duration(m.tiempo_12kmh),
         m.num_paladas,
-        m.dist_media_palada,
+        fmt(m.dist_media_palada),
         std_str,
     )
 
@@ -184,7 +206,7 @@ def graficar_200m(
     ax1.text(
         0.60,
         0.43,
-        f"Tiempo 200m:  {fmt(m.tiempo_total)} s",
+        f"Tiempo {m.distancia}m:  {format_duration(m.tiempo_total)}",
         transform=ax1.transAxes,
         fontsize=14,
         fontweight="bold",
@@ -263,12 +285,19 @@ def graficar_200m(
         for ax in (ax2, ax3, ax4):
             ax.axvline(x=t, color="gray", ls=":", alpha=0.28, lw=0.6)
 
-    dist_times = [
-        (m.tiempo_50m, "#888"),
-        (m.tiempo_100m, "#888"),
-        (m.tiempo_150m, "#f39c12"),
-        (test_time, "#e74c3c"),
-    ]
+    dist_times: list[tuple[float, str]] = []
+    keys = sorted(m.tiempos_por_distancia.keys(), key=lambda k: int(k))
+    for i, k in enumerate(keys):
+        t = m.tiempos_por_distancia.get(k)
+        if t is None:
+            continue
+        if i == len(keys) - 1:
+            color = "#e74c3c"
+        elif i == len(keys) - 2:
+            color = "#f39c12"
+        else:
+            color = "#888"
+        dist_times.append((t, color))
     for ax in (ax1, ax2, ax3, ax4):
         for t_val, c in dist_times:
             if t_val is not None and 0 < t_val < test_time:
@@ -519,8 +548,8 @@ def graficar_200m_plotly(
             )
             fig.add_annotation(
                 x=m.tiempo_12kmh / 2, y=m.velocidad_maxima * 0.92,
-                text=f"0-12 km/h: {m.tiempo_12kmh:.2f}s",
-                showarrow=False, font=dict(color="#7a5c00", size=11),
+                text=f"0-12 km/h: {format_duration(m.tiempo_12kmh)}", showarrow=False,
+                font=dict(color="#7a5c00", size=11),
                 row=r, col=1,
             )
 
@@ -531,15 +560,24 @@ def graficar_200m_plotly(
                 row=r, col=1,
             )
 
-        for t_m, label in [(m.tiempo_50m, "50m"), (m.tiempo_100m, "100m"), (m.tiempo_150m, "150m")]:
-            if t_m is not None and 0 < t_m < test_time:
-                fig.add_vline(x=t_m, line=dict(color="#888", dash="dash", width=1), row=r, col=1)
-                fig.add_annotation(
-                    x=t_m, y=m.velocidad_maxima * 0.45,
-                    text=label, showarrow=False,
-                    font=dict(color="#555", size=10),
-                    row=r, col=1,
-                )
+        # Intermediate markers (D/4, D/2, 3D/4) — from tiempos_por_distancia
+        keys = sorted(m.tiempos_por_distancia.keys(), key=lambda k: int(k))
+        for i, k in enumerate(keys[:-1]):  # skip last (it's test_time)
+            t_m = m.tiempos_por_distancia.get(k)
+            if t_m is None or not (0 < t_m < test_time):
+                continue
+            color = "#f39c12" if i == len(keys) - 2 else "#888"
+            fig.add_vline(
+                x=t_m,
+                line=dict(color=color, dash="dash", width=1),
+                row=r, col=1,
+            )
+            fig.add_annotation(
+                x=t_m, y=m.velocidad_maxima * 0.45,
+                text=f"{k}m<br>{format_duration(t_m)}", showarrow=False,
+                font=dict(color="#555", size=10),
+                row=r, col=1,
+            )
 
         for vt in valley_t:
             fig.add_trace(go.Scatter(
@@ -605,7 +643,7 @@ def graficar_200m_plotly(
                 x=mid_times, y=bar_heights,
                 marker_color=bar_colors, opacity=0.85,
                 showlegend=False,
-                text=[f"{d:.2f}" for d in bar_heights],
+                text=[fmt(d) for d in bar_heights],
                 textposition="outside",
                 hovertemplate="%{y:.2f}m<extra></extra>",
             ), row=r, col=1)

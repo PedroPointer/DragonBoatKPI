@@ -8,11 +8,12 @@ from typing import Optional
 
 @dataclass
 class TramoDetectado:
-    """A detected 200m segment within a CSV file."""
+    """A detected training segment (200/500/1000/2000m) within a CSV file."""
     start_idx: int
     end_idx: int
     calm_start: int
     calm_end: int
+    distancia: int = 200  # 200 | 500 | 1000 | 2000
 
 
 @dataclass
@@ -24,7 +25,7 @@ class PaladasInfo:
 
 @dataclass
 class Metricas:
-    """All computed metrics for a single 200m test."""
+    """All computed metrics for a single training test."""
     tiempo_total: float
     velocidad_media: float
     velocidad_maxima: float
@@ -53,6 +54,12 @@ class Metricas:
     dist_max_palada: Optional[float] = None
     dist_min_palada: Optional[float] = None
 
+    # Distance classification (200 | 500 | 1000 | 2000)
+    distancia: int = 200
+
+    # Markers every D/4 of the test distance, e.g. {"50": 7.5, "100": 13.2, ...}
+    tiempos_por_distancia: dict[str, float] = field(default_factory=dict)
+
     @property
     def test_time(self) -> float:
         return self.tiempo_total
@@ -62,12 +69,12 @@ class Metricas:
         """Deterministic filename for the generated chart."""
         from datetime import datetime
         ts = datetime.fromtimestamp(self.start_time) if self.start_time > 1e9 else datetime.now()
-        return f"200m_{ts.strftime('%m%d_%H-%M')}_{self.tiempo_total:.2f}"
+        return f"{self.distancia}m_{ts.strftime('%m%d_%H-%M')}_{self.tiempo_total:.2f}"
 
 
 @dataclass
 class SessionInforme:
-    """Report for one CSV file containing multiple 200m tests."""
+    """Report for one CSV file containing multiple test runs."""
     filename: str
     fecha: str
     formato: str

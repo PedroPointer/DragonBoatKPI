@@ -13,12 +13,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, File
 from fastapi.templating import Jinja2Templates
 
 from dragonboat.analysis import (
-    analizar_200m,
+    analizar_tramo,
     build_gps_data_json,
     cargar_csv,
-    detectar_200m,
+    detectar_tramos,
     detectar_paladas,
+    format_duration,
     generar_informe_str,
+    generar_resumen_sesion,
     imprimir_metricas,
     nombre_base,
 )
@@ -26,6 +28,7 @@ from dragonboat.config import settings
 from dragonboat.repo import (
     crear_csv_upload,
     crear_sesion,
+    crear_sesion_manual,
     crear_test_gps_data,
     get_csv_upload,
     get_csv_upload_by_filename,
@@ -35,6 +38,7 @@ from dragonboat.repo import (
     get_csv_sesiones,
     get_ranking,
     get_boat_stats,
+    get_recent_uploads,
     get_distinct_names,
     update_sesion,
     delete_sesion,
@@ -53,7 +57,7 @@ from dragonboat.repo import (
     list_crew,
     get_assignments,
 )
-from dragonboat.db_models import Boat, Sesion as SesionModel
+from dragonboat.db_models import Boat, CsvUpload, Sesion, Sesion as SesionModel
 from dragonboat.database import get_session as db_session
 from dragonboat.visualization.charts import graficar_200m, graficar_200m_plotly
 
@@ -61,6 +65,29 @@ router = APIRouter()
 
 templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
+
+import json as _json
+
+from dragonboat.analysis._utils import fmt as _fmt_decimal
+
+
+def _register_jinja_filters() -> None:
+    """Register custom Jinja2 filters used by templates."""
+    def from_json(value):
+        if not value:
+            return {}
+        try:
+            return _json.loads(value)
+        except (ValueError, TypeError):
+            return {}
+
+    templates.env.filters["from_json"] = from_json
+    templates.env.filters["duration"] = format_duration
+    templates.env.filters["comma"] = _fmt_decimal
+
+
+# Register on import
+_register_jinja_filters()
 
 CATEGORIAS = [
     "Open Sénior", "Open Veterano",
@@ -70,12 +97,28 @@ CATEGORIAS = [
 ]
 
 
+def _parse_tiempo(s: str) -> float:
+    """Parse tiempo string (mm:ss,cc or hh:mm:ss,cc) to seconds."""
+    s = s.strip()
+    if not s:
+        raise ValueError("tiempo vacío")
+    s = s.replace(",", ".")
+    parts = s.split(":")
+    if len(parts) == 3:
+        return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+    if len(parts) == 2:
+        return float(parts[0]) * 60 + float(parts[1])
+    return float(s)
+
+
 # ── Home ──
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    ranking = get_ranking(limit=20)
-    boat_stats = get_boat_stats()
+    rankings = {
+        d: get_ranking(distancia=d, limit=5)
+        for d in settings.distancias_validas
+    }
     sesiones = get_sesiones(50)
 
     incomplete = []
@@ -99,8 +142,8 @@ async def home(request: Request):
         name="home.html",
         request=request,
         context={
-            "ranking": ranking,
-            "boat_stats": boat_stats,
+            "rankings": rankings,
+            "distancias_validas": settings.distancias_validas,
             "incomplete": incomplete,
             "active_nav": "home",
         },
@@ -128,6 +171,7 @@ async def registros_list(
             "numero": s.test_number,
             "nombre": s.custom_name or "",
             "tipo": s.tipo or "",
+            "distancia": s.distancia or 200,
             "barco": s.boat.name if s.boat else "",
             "tiempo": s.metric.tiempo_total if s.metric else None,
             "categoria": s.categoria or "",
@@ -139,12 +183,19 @@ async def registros_list(
     with db_session() as s:
         boats = s.query(Boat).all()
 
+    tipos = list_test_types()
+    names = get_distinct_names()
+
     return templates.TemplateResponse(
         name="registros.html",
         request=request,
         context={
             "rows": rows,
             "boats": boats,
+            "categorias": CATEGORIAS,
+            "tipos": tipos,
+            "names": names,
+            "distancias_validas": settings.distancias_validas,
             "filter_tipo": tipo or "",
             "filter_barco": barco or "",
             "active_nav": "registros",
@@ -182,6 +233,48 @@ async def sesion_update(
 @router.post("/registros/{prueba_id}/delete")
 async def sesion_delete(prueba_id: int):
     delete_sesion(prueba_id)
+    return RedirectResponse(url="/registros", status_code=302)
+
+
+@router.post("/registros/new")
+async def registro_nuevo(
+    request: Request,
+    custom_name: str = Form(""),
+    distancia: int = Form(...),
+    boat_id: int = Form(None),
+    tiempo: str = Form(...),
+    categoria: str = Form(""),
+    tipo: str = Form(""),
+    fecha: str = Form(""),
+):
+    try:
+        tiempo_s = _parse_tiempo(tiempo)
+    except (ValueError, TypeError):
+        return RedirectResponse(url="/registros?error=Tiempo+inv%C3%A1lido", status_code=302)
+
+    if tiempo_s <= 0:
+        return RedirectResponse(url="/registros?error=El+tiempo+debe+ser+mayor+a+cero", status_code=302)
+
+    velocidad_media = distancia / tiempo_s * 3.6  # km/h
+
+    fecha_hora = datetime.now()
+    if fecha:
+        try:
+            fecha_hora = datetime.fromisoformat(fecha)
+        except ValueError:
+            pass
+
+    crear_sesion_manual(
+        custom_name=custom_name.strip() or None,
+        distancia=distancia,
+        boat_id=boat_id if boat_id and boat_id > 0 else None,
+        tiempo_total=tiempo_s,
+        velocidad_media=velocidad_media,
+        categoria=categoria.strip() or None,
+        tipo=tipo.strip() or None,
+        fecha_hora=fecha_hora,
+    )
+
     return RedirectResponse(url="/registros", status_code=302)
 
 
@@ -228,12 +321,15 @@ async def test_page(request: Request, test_id: int):
         for a in raw_assignments
     ])
 
+    has_gps = test.gps_data is not None
+
     return templates.TemplateResponse(
         name="test.html",
         request=request,
         context={
             "test": test,
             "chart_available": chart_available,
+            "has_gps": has_gps,
             "boat": boat,
             "boats": boats,
             "names": names,
@@ -355,7 +451,11 @@ async def informes_page(request: Request):
     return templates.TemplateResponse(
         name="informes.html",
         request=request,
-        context={"active_nav": "informes"},
+        context={
+            "active_nav": "informes",
+            "distancias_validas": settings.distancias_validas,
+            "recent_uploads": get_recent_uploads(limit=5),
+        },
     )
 
 
@@ -368,6 +468,7 @@ async def upload_csv(request: Request, file: UploadFile = File(...)):
             context={
                 "error": "Solo se aceptan archivos CSV",
                 "active_nav": "informes",
+                "distancias_validas": settings.distancias_validas,
             },
             status_code=400,
         )
@@ -384,6 +485,7 @@ async def upload_csv(request: Request, file: UploadFile = File(...)):
             context={
                 "duplicate_filename": file.filename,
                 "active_nav": "informes",
+                "distancias_validas": settings.distancias_validas,
             },
         )
 
@@ -403,18 +505,20 @@ async def upload_csv(request: Request, file: UploadFile = File(...)):
             context={
                 "error": "Error al leer el CSV",
                 "active_nav": "informes",
+                "distancias_validas": settings.distancias_validas,
             },
             status_code=400,
         )
 
-    tramos = detectar_200m(df)
+    tramos = detectar_tramos(df)
     if not tramos:
         return templates.TemplateResponse(
             name="informes.html",
             request=request,
             context={
-                "error": "No se detectaron tramos de 200m",
+                "error": "No se detectaron tramos válidos (200/500/1000/2000m)",
                 "active_nav": "informes",
+                "distancias_validas": settings.distancias_validas,
             },
             status_code=400,
         )
@@ -427,15 +531,25 @@ async def upload_csv(request: Request, file: UploadFile = File(...)):
     csv_upload = crear_csv_upload(file.filename, file_path=file_path)
     idx_valido = 0
     first_sesion_id = None
+    pruebas_info: list[tuple] = []  # collected for combined .txt report
+
+    # Default boat (DB12) for all sessions in this upload
+    default_boat_id: int | None = None
+    with db_session() as _s:
+        _db12 = _s.query(Boat).filter(Boat.name == "DB12").first()
+        if _db12 is not None:
+            default_boat_id = _db12.id
 
     for tramo in tramos:
         paladas_info = detectar_paladas(df, tramo.start_idx, tramo.end_idx)
-        m = analizar_200m(df, tramo.start_idx, tramo.end_idx, paladas_info)
+        m = analizar_tramo(df, tramo.start_idx, tramo.end_idx, paladas_info, distancia=tramo.distancia)
         if m is None:
             continue
 
         t11 = m.tiempo_11kmh if m.tiempo_11kmh is not None else 99
-        if not (m.tiempo_total < 85.0 and t11 < 20.0 and m.velocidad_media > 9.0):
+        limite = settings.limite_tiempo_max.get(tramo.distancia, 1500.0)
+        media_check = (tramo.distancia == 2000) or (m.velocidad_media > 9.0)
+        if not (m.tiempo_total < limite and t11 < 20.0 and media_check):
             continue
 
         m.calm_start = tramo.calm_start
@@ -457,12 +571,17 @@ async def upload_csv(request: Request, file: UploadFile = File(...)):
             fecha_hora=start_dt,
             tipo="entreno",
             chart_filename=nb,
+            distancia=tramo.distancia,
+            tiempos_por_distancia=m.tiempos_por_distancia,
+            boat_id=default_boat_id,
         )
         gps_data = build_gps_data_json(df, tramo.start_idx, tramo.end_idx, paladas_info, m)
         crear_test_gps_data(sesion.id, gps_data)
         graficar_200m_plotly(gps_data, m, settings.resolved_output_dir, sesion.id)
         if first_sesion_id is None:
             first_sesion_id = sesion.id
+
+        pruebas_info.append((m, idx_valido, start_dt, paladas_info.dist_por_palada))
 
     os.unlink(tmp_path)
 
@@ -473,11 +592,43 @@ async def upload_csv(request: Request, file: UploadFile = File(...)):
             context={
                 "error": "No se detectaron tramos validos",
                 "active_nav": "informes",
+                "distancias_validas": settings.distancias_validas,
             },
             status_code=400,
         )
 
-    return RedirectResponse(url=f"/test/{first_sesion_id}", status_code=302)
+    # Build combined .txt report and write to data/output/
+    output_dir = settings.resolved_output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    base = file.filename.rsplit(".", 1)[0]
+    report_filename = f"Informe_{base}.txt"
+    report_path = output_dir / report_filename
+    try:
+        report_text = generar_resumen_sesion(file.filename, pruebas_info)
+        report_path.write_text(report_text, encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        report_filename = None
+        print(f"[WARN] No se pudo escribir el informe .txt: {exc}")
+
+    conteo = {d: 0 for d in settings.distancias_validas}
+    for m, _, _, _ in pruebas_info:
+        conteo[m.distancia] += 1
+
+    return templates.TemplateResponse(
+        name="informes.html",
+        request=request,
+        context={
+            "resumen": {
+                "csv_filename": file.filename,
+                "report_filename": report_filename,
+                "conteo_distancias": conteo,
+                "total_pruebas": len(pruebas_info),
+                "first_sesion_id": first_sesion_id,
+            },
+            "distancias_validas": settings.distancias_validas,
+            "active_nav": "informes",
+        },
+    )
 
 
 @router.post("/informes/generate")
@@ -488,7 +639,35 @@ async def informes_generate(request: Request, session_id: int = Form(...)):
         context={
             "message": "Generación de PDF próximamente",
             "active_nav": "informes",
+            "distancias_validas": settings.distancias_validas,
         },
+    )
+
+
+@router.get("/informes/reporte/{filename}")
+async def ver_reporte(filename: str):
+    """Return JSON with the .txt content for the AJAX viewer on /informes."""
+    if ".." in filename or filename.startswith("/") or "/" in filename:
+        return JSONResponse({"error": "Filename inválido"}, status_code=400)
+    path = settings.resolved_output_dir / filename
+    if not path.exists() or not path.is_file():
+        return JSONResponse({"error": "Informe no encontrado"}, status_code=404)
+    content = path.read_text(encoding="utf-8")
+    return JSONResponse({"filename": filename, "content": content})
+
+
+@router.get("/informes/reporte/{filename:path}/download")
+async def descargar_reporte(filename: str):
+    """Serve the .txt report as a download."""
+    if ".." in filename or filename.startswith("/"):
+        return JSONResponse({"error": "Filename inválido"}, status_code=400)
+    path = settings.resolved_output_dir / filename
+    if not path.exists() or not path.is_file():
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return FileResponse(
+        str(path),
+        filename=filename,
+        media_type="text/plain; charset=utf-8",
     )
 
 
@@ -655,6 +834,10 @@ async def api_sessions():
             "tipo": s.tipo,
             "boat_name": s.boat.name if s.boat else None,
             "custom_name": s.custom_name,
+            "tiempo_total": s.metric.tiempo_total if s.metric else None,
+            "tiempo_total_formatted": (
+                format_duration(s.metric.tiempo_total) if s.metric else None
+            ),
         }
         for s in sesiones
     ])

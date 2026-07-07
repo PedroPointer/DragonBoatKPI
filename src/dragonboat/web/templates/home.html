@@ -2,56 +2,17 @@
 {% block title %}Home — Dragon Boat Analyzer{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <span class="current">🏠 Home</span>
+    <span class="current"><img src="/static/img/home_24dp.svg" alt="" class="breadcrumb-icon"> Home</span>
 </nav>
 {% endblock %}
 {% block content %}
 <h1>Home</h1>
 
-{% if boat_stats %}
+{% for d in distancias_validas %}
+{% set ranking = rankings.get(d, []) %}
 <div class="card">
-    <h2>Estadísticas por barco</h2>
-    {% for stat in boat_stats %}
-    <div style="margin-bottom: 1.5rem;">
-        <h3 class="boat-section-title">
-            <span class="badge {% if stat.name == 'DB12' %}db12{% else %}db22{% endif %}">{{ stat.name }}</span>
-            {{ stat.display_name }}
-        </h3>
-        <div class="stats-grid">
-            <div class="stat-card stat-card-featured">
-                <div class="label">Mejor tiempo</div>
-                <div class="value gold">{{ stat.best_tiempo }}</div>
-                <div class="sub">s · {{ stat.best_tiempo_paladas or '—' }} paladas</div>
-                <div class="sub-meta">vel. máx {{ "%.2f"|format(stat.best_tiempo_vel_max) if stat.best_tiempo_vel_max else '—' }} km/h</div>
-                <div class="sub-meta">0→12 km/h en {{ "%.2f"|format(stat.best_tiempo_t12) if stat.best_tiempo_t12 else '—' }}s</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Pruebas</div>
-                <div class="value">{{ stat.num_tests }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Dist. palada</div>
-                <div class="value">{{ stat.avg_dist_palada }}</div>
-                <div class="sub">m (media)</div>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="card">
-    <div class="empty-state">
-        <span class="empty-icon">🚤</span>
-        <h3>Aún no hay datos</h3>
-        <p>Sube un CSV desde Informes para ver estadísticas</p>
-        <a href="/informes" class="btn btn-secondary">Ir a Informes</a>
-    </div>
-</div>
-{% endif %}
-
-{% if ranking %}
-<div class="card">
-    <h2>Ranking de tiempos (Top 20)</h2>
+    <h2>{{ d }}m Ranking de tiempos</h2>
+    {% if ranking %}
     <div class="table-mobile-scroll">
     <table>
         <thead>
@@ -74,18 +35,24 @@
                 <td><strong>{{ r.custom_name or "—" }}</strong></td>
                 <td><span class="badge {% if r.boat_name == 'DB12' %}db12{% elif r.boat_name == 'DB22' %}db22{% endif %}">{{ r.boat_name or "—" }}</span></td>
                 <td>{{ r.categoria or "—" }}</td>
-                <td><span class="badge info">{{ "%.2f"|format(r.tiempo_total) }}s</span></td>
-                <td>{{ "%.2f"|format(r.velocidad_media) }}</td>
+                <td><span class="badge info">{{ r.tiempo_total|duration }}</span></td>
+                <td>{{ r.velocidad_media|comma }}</td>
                 <td>{{ r.num_paladas }}</td>
-                <td>{{ "%.2f"|format(r.dist_media_palada) }}m</td>
+                <td>{{ r.dist_media_palada|comma }}m</td>
                 <td style="color: #64748b; font-size: 0.8rem;">{{ r.fecha.strftime("%d/%m/%y") if r.fecha else '' }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     </div>
+    {% else %}
+    <div class="empty-state" style="padding: 1.5rem 1rem;">
+        <span class="empty-icon" style="font-size: 2rem;">⏱️</span>
+        <p>Aún no hay pruebas de {{ d }}m registradas</p>
+    </div>
+    {% endif %}
 </div>
-{% endif %}
+{% endfor %}
 
 {% if incomplete %}
 <div class="card">

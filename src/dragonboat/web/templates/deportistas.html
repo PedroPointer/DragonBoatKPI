@@ -3,9 +3,9 @@
 
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="/">🏠 Home</a>
+    <a href="/"><img src="/static/img/home_24dp.svg" alt="" class="breadcrumb-icon"> Home</a>
     <span class="separator">/</span>
-    <span class="current">👥 Deportistas</span>
+    <span class="current"><img src="/static/img/person_edit_24dp.svg" alt="" class="breadcrumb-icon"> Deportistas</span>
 </nav>
 {% endblock %}
 
@@ -45,7 +45,11 @@
                     {% if cm.categoria %}<span class="badge">{{ cm.categoria }}</span>{% else %}<span style="color: #475569;">—</span>{% endif %}
                 </td>
                 <td>
-                    <button class="btn small btn-secondary" onclick="openEditDeportista({{ cm.id }}, {{ cm.nombre|tojson }}, {{ cm.apellido|tojson }}, {{ cm.categoria|tojson }})">Editar</button>
+                    <button type="button" class="btn small btn-secondary btn-edit-deportista"
+                            data-id="{{ cm.id }}"
+                            data-nombre="{{ cm.nombre }}"
+                            data-apellido="{{ cm.apellido }}"
+                            data-categoria="{{ cm.categoria or '' }}">Editar</button>
                     <form action="/deportistas/{{ cm.id }}/delete" method="post" style="display: inline;"
                           onsubmit="return confirm('Eliminar {{ cm.nombre }} {{ cm.apellido }}?')">
                         <button type="submit" class="btn small danger">Eliminar</button>
@@ -162,21 +166,32 @@
 </div>
 
 <script>
-function openEditDeportista(id, nombre, apellido, categoria) {
+(function() {
     var form = document.getElementById('form-editar-deportista');
-    form.action = '/deportistas/' + id + '/edit';
-    form.querySelector('[name=nombre]').value = nombre || '';
-    form.querySelector('[name=apellido]').value = apellido || '';
-    var select = form.querySelector('[name=categoria]');
-    var cat = categoria || '';
-    for (var i = 0; i < select.options.length; i++) {
-        if (select.options[i].value === cat) {
-            select.selectedIndex = i;
-            break;
+    if (!form) return;
+    var inputNombre = form.querySelector('[name=nombre]');
+    var inputApellido = form.querySelector('[name=apellido]');
+    var selectCategoria = form.querySelector('[name=categoria]');
+    var inputPhoto = form.querySelector('[name=photo]');
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest && e.target.closest('.btn-edit-deportista');
+        if (!btn) return;
+        e.preventDefault();
+        var id = btn.getAttribute('data-id');
+        form.action = '/deportistas/' + id + '/edit';
+        inputNombre.value = btn.getAttribute('data-nombre') || '';
+        inputApellido.value = btn.getAttribute('data-apellido') || '';
+        var cat = btn.getAttribute('data-categoria') || '';
+        for (var i = 0; i < selectCategoria.options.length; i++) {
+            if (selectCategoria.options[i].value === cat) {
+                selectCategoria.selectedIndex = i;
+                break;
+            }
         }
-    }
-    form.querySelector('[name=photo]').value = '';
-    openModal('modal-editar-deportista');
-}
+        inputPhoto.value = '';
+        openModal('modal-editar-deportista');
+    });
+})();
 </script>
 {% endblock %}

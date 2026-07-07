@@ -68,6 +68,7 @@ class Sesion(Base):
     tipo: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # "competición" | "entreno"
     boat_id: Mapped[Optional[int]] = mapped_column(ForeignKey("boats.id"), nullable=True)
     categoria: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    distancia: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 200 | 500 | 1000 | 2000
 
     csv_upload = relationship("CsvUpload", back_populates="sesiones")
     boat = relationship("Boat", back_populates="sesiones")
@@ -103,6 +104,7 @@ class TestMetric(Base):
     dist_max_palada: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     dist_min_palada: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     chart_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    tiempos_por_distancia: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON: {"50": 7.5, ...}
 
     sesion = relationship("Sesion", back_populates="metric")
 

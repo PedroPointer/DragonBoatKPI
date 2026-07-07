@@ -3,12 +3,12 @@
 
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="/">🏠 Home</a>
+    <a href="/"><img src="/static/img/home_24dp.svg" alt="" class="breadcrumb-icon"> Home</a>
     <span class="separator">/</span>
     {% if section == "main" %}
-        <span class="current">⚙️ Configuración</span>
+        <span class="current"><img src="/static/img/settings_24dp.svg" alt="" class="breadcrumb-icon"> Configuración</span>
     {% else %}
-        <a href="/config">⚙️ Configuración</a>
+        <a href="/config"><img src="/static/img/settings_24dp.svg" alt="" class="breadcrumb-icon"> Configuración</a>
         <span class="separator">/</span>
         {% if section == "barcos" %}
             <span class="current">🚤 Barcos</span>

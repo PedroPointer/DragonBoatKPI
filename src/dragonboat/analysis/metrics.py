@@ -1,4 +1,7 @@
-"""Metric computation — adapted from dragonboat_analyzer.py lines 270-356."""
+"""Metric computation — adapted from dragonboat_analyzer.py lines 270-356.
+
+Extended to support any of the standard distances (200/500/1000/2000m).
+"""
 
 from __future__ import annotations
 
@@ -22,13 +25,14 @@ def calcular_pitch(
     return np.degrees(np.arctan2(lp_x, lp_z))
 
 
-def analizar_200m(
+def analizar_tramo(
     df: pd.DataFrame,
     start_idx: int,
     end_idx: int,
     paladas_info: PaladasInfo,
+    distancia: int = 200,
 ) -> Metricas | None:
-    """Compute all metrics for a 200m segment.
+    """Compute all metrics for a training segment of the given distance.
 
     Returns Metricas or None if the segment is invalid.
     """
@@ -40,7 +44,7 @@ def analizar_200m(
     start_dist = dist[0]
     start_time = time[0]
 
-    target_dist = start_dist + settings.distancia_200m
+    target_dist = start_dist + distancia
     exact_idx = None
     for i in range(len(dist)):
         if dist[i] >= target_dist:
@@ -56,7 +60,7 @@ def analizar_200m(
     exact_time = t_prev + frac * (t_curr - t_prev)
     test_time = exact_time - start_time
 
-    avg_speed_kmh = (settings.distancia_200m / test_time) * 3.6
+    avg_speed_kmh = (distancia / test_time) * 3.6
     max_speed = float(np.max(speed))
     deriv = np.gradient(speed, time) / 3.6
     max_acc = float(np.max(deriv))
@@ -114,6 +118,15 @@ def analizar_200m(
     else:
         speed_min_post10 = max_speed
 
+    # ── Markers every D/4 of the test distance ──
+    step = distancia / 4.0
+    tiempos_por_distancia: dict[str, float] = {}
+    for i in range(1, 5):
+        target = step * i
+        t = tiempo_distancia(start_dist + target, time, dist, start_time)
+        if t is not None:
+            tiempos_por_distancia[str(int(target))] = float(round(t, 2))
+
     return Metricas(
         tiempo_total=test_time,
         velocidad_media=avg_speed_kmh,
@@ -136,4 +149,17 @@ def analizar_200m(
         end_idx=int(end_idx),
         start_time=start_time,
         exact_time=exact_time,
+        distancia=distancia,
+        tiempos_por_distancia=tiempos_por_distancia,
     )
+
+
+# ── Back-compat alias ──
+def analizar_200m(
+    df: pd.DataFrame,
+    start_idx: int,
+    end_idx: int,
+    paladas_info: PaladasInfo,
+) -> Metricas | None:
+    """Legacy entrypoint. Equivalent to analizar_tramo with distancia=200."""
+    return analizar_tramo(df, start_idx, end_idx, paladas_info, distancia=200)

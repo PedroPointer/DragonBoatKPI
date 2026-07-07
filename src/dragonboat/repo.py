@@ -27,6 +27,8 @@ from dragonboat.db_models import (
     CrewAssignment,
 )
 from dragonboat.models import Metricas
+from dragonboat.config import settings
+from dragonboat.analysis._utils import format_duration
 
 
 # ── CsvUpload CRUD ──
@@ -111,6 +113,8 @@ def crear_sesion(
     tipo: Optional[str] = "entreno",
     chart_filename: Optional[str] = None,
     boat_id: Optional[int] = None,
+    distancia: Optional[int] = None,
+    tiempos_por_distancia: Optional[dict] = None,
 ) -> Sesion:
     with get_session() as s:
         sesion = Sesion(
@@ -119,9 +123,18 @@ def crear_sesion(
             fecha_hora=fecha_hora,
             tipo=tipo,
             boat_id=boat_id,
+            distancia=distancia if distancia is not None else metric.distancia,
         )
         s.add(sesion)
         s.flush()
+
+        tpd_json = (
+            json.dumps(tiempos_por_distancia, ensure_ascii=False)
+            if tiempos_por_distancia is not None
+            else json.dumps(metric.tiempos_por_distancia, ensure_ascii=False)
+            if metric.tiempos_por_distancia
+            else None
+        )
 
         tm = TestMetric(
             sesion_id=sesion.id,
@@ -141,6 +154,57 @@ def crear_sesion(
             dist_max_palada=metric.dist_max_palada,
             dist_min_palada=metric.dist_min_palada,
             chart_filename=chart_filename,
+            tiempos_por_distancia=tpd_json,
+        )
+        s.add(tm)
+        s.commit()
+        s.refresh(sesion)
+        return sesion
+
+
+def crear_sesion_manual(
+    custom_name: str | None,
+    distancia: int,
+    boat_id: int | None,
+    tiempo_total: float,
+    velocidad_media: float,
+    categoria: str | None = None,
+    tipo: str | None = None,
+    fecha_hora: datetime | None = None,
+) -> Sesion:
+    with get_session() as s:
+        sesion = Sesion(
+            csv_upload_id=None,
+            fecha_hora=fecha_hora or datetime.now(),
+            test_number=None,
+            custom_name=custom_name,
+            tipo=tipo,
+            boat_id=boat_id,
+            categoria=categoria,
+            distancia=distancia,
+        )
+        s.add(sesion)
+        s.flush()
+
+        tm = TestMetric(
+            sesion_id=sesion.id,
+            tiempo_total=tiempo_total,
+            velocidad_media=velocidad_media,
+            velocidad_maxima=0,
+            velocidad_min_post10=None,
+            aceleracion_max=0,
+            tiempo_11kmh=None,
+            tiempo_12kmh=None,
+            tiempo_50m=None,
+            tiempo_100m=None,
+            tiempo_150m=None,
+            num_paladas=0,
+            dist_media_palada=0,
+            dist_std_palada=0,
+            dist_max_palada=None,
+            dist_min_palada=None,
+            chart_filename=None,
+            tiempos_por_distancia=None,
         )
         s.add(tm)
         s.commit()
@@ -156,6 +220,7 @@ def get_sesion(prueba_id: int) -> Optional[Sesion]:
                 selectinload(Sesion.metric),
                 selectinload(Sesion.boat),
                 selectinload(Sesion.csv_upload),
+                selectinload(Sesion.gps_data),
                 selectinload(Sesion.crew_assignments).selectinload(CrewAssignment.crew_member),
             )
             .filter(Sesion.id == prueba_id)
@@ -258,9 +323,10 @@ def get_distinct_names() -> list[str]:
 
 def get_ranking(
     boat_name: Optional[str] = None,
-    limit: int = 10,
+    limit: int = 5,
+    distancia: Optional[int] = None,
 ) -> list[dict]:
-    """Top N fastest 200m pruebas."""
+    """Top N fastest pruebas, optionally filtered by distance (200/500/1000/2000)."""
     with get_session() as s:
         q = (
             s.query(
@@ -272,31 +338,99 @@ def get_ranking(
                 TestMetric.dist_media_palada,
                 Sesion.custom_name,
                 Sesion.categoria,
+                Sesion.distancia,
                 Boat.name.label("boat_name"),
                 Sesion.fecha_hora,
             )
             .join(Sesion, TestMetric.sesion_id == Sesion.id)
             .outerjoin(Boat, Sesion.boat_id == Boat.id)
-            .order_by(TestMetric.tiempo_total)
-            .limit(limit)
         )
         if boat_name:
             q = q.filter(Boat.name == boat_name)
+        if distancia is not None:
+            q = q.filter(Sesion.distancia == distancia)
+        q = q.order_by(TestMetric.tiempo_total).limit(limit)
         return [
             {
                 "sesion_id": r.sesion_id,
                 "tiempo_total": r.tiempo_total,
+                "tiempo_total_formatted": format_duration(r.tiempo_total),
                 "velocidad_media": r.velocidad_media,
                 "velocidad_maxima": r.velocidad_maxima,
                 "num_paladas": r.num_paladas,
                 "dist_media_palada": r.dist_media_palada,
                 "custom_name": r.custom_name,
                 "categoria": r.categoria,
+                "distancia": r.distancia,
                 "boat_name": r.boat_name,
                 "fecha": r.fecha_hora,
             }
             for r in q.all()
         ]
+
+
+# ── Recent CSV Uploads ──
+
+def get_recent_uploads(limit: int = 5) -> list[dict]:
+    """Return the latest N CSV uploads with per-upload aggregated info.
+
+    Each entry includes:
+      - id, filename, uploaded_at
+      - fecha_datos: earliest fecha_hora of the sesiones (day of the GPS recording)
+      - num_pruebas: total count of sesiones in this upload
+      - conteo_distancias: dict[int, int] of pruebas per distance
+      - first_sesion_id: id of the sesion with the lowest test_number
+      - report_filename: "Informe_{base}.txt"
+      - report_exists: True if the .txt file is still on disk
+    Ordered by uploaded_at DESC (newest first).
+    """
+    with get_session() as s:
+        uploads = (
+            s.query(CsvUpload)
+            .options(selectinload(CsvUpload.sesiones))
+            .order_by(desc(CsvUpload.uploaded_at))
+            .limit(limit)
+            .all()
+        )
+
+        result: list[dict] = []
+        for u in uploads:
+            sesiones = list(u.sesiones)
+            conteo = {d: 0 for d in settings.distancias_validas}
+            for ses in sesiones:
+                d = ses.distancia if ses.distancia in settings.distancias_validas else 200
+                conteo[d] = conteo.get(d, 0) + 1
+            first = (
+                s.query(Sesion)
+                .filter(Sesion.csv_upload_id == u.id)
+                .order_by(Sesion.test_number)
+                .first()
+            )
+            # The "data date" is the day the GPS recording happened
+            # (earliest fecha_hora across this upload's sesiones),
+            # NOT the administrative upload date.
+            fecha_datos = None
+            for ses in sesiones:
+                if ses.fecha_hora is None:
+                    continue
+                if fecha_datos is None or ses.fecha_hora < fecha_datos:
+                    fecha_datos = ses.fecha_hora
+            base = u.filename.rsplit(".", 1)[0] if "." in u.filename else u.filename
+            report_filename = f"Informe_{base}.txt"
+            report_path = settings.resolved_output_dir / report_filename
+            report_exists = report_path.is_file()
+            result.append({
+                "id": u.id,
+                "filename": u.filename,
+                "uploaded_at": u.uploaded_at,
+                "fecha_datos": fecha_datos,
+                "num_pruebas": len(sesiones),
+                "conteo_distancias": conteo,
+                "first_sesion_id": first.id if first else None,
+                "report_filename": report_filename,
+                "report_exists": report_exists,
+            })
+        return result
 
 
 def get_boat_stats() -> list[dict]:

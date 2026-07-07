@@ -163,9 +163,9 @@
 
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="/">🏠 Home</a>
+    <a href="/"><img src="/static/img/home_24dp.svg" alt="" class="breadcrumb-icon"> Home</a>
     <span class="separator">/</span>
-    <span class="current">📋 Registros</span>
+    <span class="current"><img src="/static/img/iconoDragon.svg" alt="" class="breadcrumb-icon"> Registros</span>
 </nav>
 {% endblock %}
 
@@ -181,16 +181,17 @@
     <div class="filtros-bar">
         <h2 style="margin-bottom: 0;">Historial</h2>
         <div>
-            <span class="badge badge-info" id="filtro-info">
+                    <span class="badge badge-info" id="filtro-info">
                 {% if request.query_params.dia %}
                 Mostrando {{ request.query_params.dia }}/{{ request.query_params.mes }}/{{ request.query_params.anio }}
                 {% else %}
                 Mostrando todos los registros
                 {% endif %}
             </span>
-            <button class="btn small btn-secondary" onclick="limpiarFiltros()" style="margin-left: 0.5rem;">
-                Limpiar filtros
-            </button>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button class="btn small" onclick="openModal('modal-registro')">Añadir +</button>
+                <button class="btn small btn-secondary" onclick="limpiarFiltros()">Limpiar filtros</button>
+            </div>
         </div>
     </div>
 
@@ -200,9 +201,9 @@
             <tr>
                 <th>#</th>
                 <th>Nombre</th>
-                <th>Tipo</th>
+                <th>Distancia</th>
                 <th>Barco</th>
-                <th>Tiempo (s)</th>
+                <th>Tiempo</th>
                 <th>Categoría</th>
                 <th>Fecha</th>
                 <th>Hora</th>
@@ -211,12 +212,12 @@
         </thead>
         <tbody>
             {% for r in rows %}
-            <tr class="row-link" onclick="window.location='/test/{{ r.prueba_id }}'">
+            <tr class="row-link row-tipo-{{ r.tipo or 'entreno' }}" data-tipo="{{ r.tipo or '' }}" onclick="window.location='/test/{{ r.prueba_id }}'">
                 <td>{{ r.numero }}</td>
                 <td>{{ r.nombre or "—" }}</td>
-                <td>{% if r.tipo %}<span class="badge {% if r.tipo == 'competición' %}badge-info{% endif %}">{{ r.tipo }}</span>{% else %}—{% endif %}</td>
+                <td><span class="badge info">{{ r.distancia }}m</span></td>
                 <td>{% if r.barco %}<span class="badge {% if r.barco == 'DB12' %}db12{% elif r.barco == 'DB22' %}db22{% endif %}">{{ r.barco }}</span>{% else %}—{% endif %}</td>
-                <td>{% if r.tiempo != None %}{{ "%.2f"|format(r.tiempo) }}{% else %}—{% endif %}</td>
+                <td>{% if r.tiempo != None %}{{ r.tiempo|duration }}{% else %}—{% endif %}</td>
                 <td>{% if r.categoria %}<span class="badge">{{ r.categoria }}</span>{% else %}—{% endif %}</td>
                 <td>{{ r.fecha.strftime("%d/%m/%Y") if r.fecha else "—" }}</td>
                 <td>{{ r.hora }}</td>
@@ -234,11 +235,88 @@
     </table>
     </div>
 </div>
+
+<div class="modal-overlay" id="modal-registro" onclick="if(event.target===this) closeModal('modal-registro')">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Añadir registro manual</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modal-registro')" aria-label="Cerrar">×</button>
+        </div>
+        <form action="/registros/new" method="post">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Nombres</label>
+                        <input type="text" name="custom_name" placeholder="Nombre del registro" list="manualNames">
+                        <datalist id="manualNames">
+                            {% for n in names %}<option value="{{ n }}">{% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="field">
+                        <label>Distancia</label>
+                        <select name="distancia" required>
+                            <option value="">— Distancia —</option>
+                            {% for d in distancias_validas %}
+                            <option value="{{ d }}">{{ d }}m</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Barco</label>
+                        <select name="boat_id">
+                            <option value="">— Barco —</option>
+                            {% for b in boats %}
+                            <option value="{{ b.id }}">{{ b.display_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Tiempo</label>
+                        <input type="text" name="tiempo" placeholder="ej: 01:30,50" required pattern="[0-9:,\.]+" title="Formato: mm:ss,cc (ej: 01:30,50)">
+                    </div>
+                    <div class="field">
+                        <label>Categoría</label>
+                        <select name="categoria">
+                            <option value="">— Categoría —</option>
+                            {% for c in categorias %}
+                            <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Tipo</label>
+                        <select name="tipo">
+                            <option value="">— Tipo —</option>
+                            {% for t in tipos %}
+                            <option value="{{ t.name }}">{{ t.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Fecha</label>
+                        <input type="datetime-local" name="fecha">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('modal-registro')">Descartar cambios</button>
+                <button type="submit" class="btn">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="/static/js/calendario.js"></script>
 <script src="/static/js/registros.js"></script>
+<script>
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var err = params.get('error');
+    if (err) showToast(decodeURIComponent(err), 'error');
+})();
+</script>
 <script>
 Calendario({
     container: "calendario",

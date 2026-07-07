@@ -97,9 +97,9 @@
 
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="/">🏠 Home</a>
+    <a href="/"><img src="/static/img/home_24dp.svg" alt="" class="breadcrumb-icon"> Home</a>
     <span class="separator">/</span>
-    <a href="/registros">📋 Registros</a>
+    <a href="/registros"><img src="/static/img/iconoDragon.svg" alt="" class="breadcrumb-icon"> Registros</a>
     <span class="separator">/</span>
     <span class="current">{% if test.custom_name %}{{ test.custom_name }}{% else %}Prueba #{{ test.test_number }}{% endif %}</span>
 </nav>
@@ -117,24 +117,24 @@
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
         <h2 style="margin-bottom: 0;">Métricas</h2>
-        <div class="big-time">{{ "%.2f"|format(test.metric.tiempo_total) }}s</div>
+        <div class="big-time">{{ test.metric.tiempo_total|duration }}</div>
     </div>
 
     <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
         <div class="stat-card">
             <div class="label">Vel. máxima</div>
-            <div class="value">{{ "%.2f"|format(test.metric.velocidad_maxima) }}</div>
+            <div class="value">{{ test.metric.velocidad_maxima|comma }}</div>
             <div class="sub">km/h</div>
         </div>
         <div class="stat-card">
             <div class="label">Vel. media</div>
-            <div class="value">{{ "%.2f"|format(test.metric.velocidad_media) }}</div>
+            <div class="value">{{ test.metric.velocidad_media|comma }}</div>
             <div class="sub">km/h</div>
         </div>
         <div class="stat-card">
             <div class="label">0 → 12 km/h</div>
-            <div class="value">{{ "%.2f"|format(test.metric.tiempo_12kmh) if test.metric.tiempo_12kmh else '—' }}</div>
-            <div class="sub">s</div>
+            <div class="value">{{ test.metric.tiempo_12kmh|duration if test.metric.tiempo_12kmh else '—' }}</div>
+            <div class="sub">hh:mm:ss,mm</div>
         </div>
         <div class="stat-card">
             <div class="label">Paladas</div>
@@ -143,12 +143,12 @@
         </div>
         <div class="stat-card">
             <div class="label">Dist. palada</div>
-            <div class="value">{{ "%.2f"|format(test.metric.dist_media_palada) }}</div>
+            <div class="value">{{ test.metric.dist_media_palada|comma }}</div>
             <div class="sub">m</div>
         </div>
         <div class="stat-card">
             <div class="label">Consistencia</div>
-            <div class="value">{{ "%.2f"|format(test.metric.dist_std_palada) if test.metric.dist_std_palada > 0 else '—' }}</div>
+            <div class="value">{{ test.metric.dist_std_palada|comma if test.metric.dist_std_palada > 0 else '—' }}</div>
             <div class="sub">m (std)</div>
         </div>
     </div>
@@ -196,6 +196,7 @@
     </div>
 </div>
 
+{% if has_gps %}
 {# ── Mini-mapa GPS (Leaflet) ── #}
 <div class="card">
     <div class="mapa-controls">
@@ -238,6 +239,7 @@
     {# Vista Plotly (default — lazy load on first render) #}
     <div id="chart-plotly-container"></div>
 </div>
+{% endif %}
 
 {# ── Datos generales de la carrera ── #}
 <div class="card">
@@ -253,18 +255,30 @@
                         <th>Tiempo (s)</th>
                     </tr>
                 </thead>
-                <tbody>
+            <tbody>
+                {% set tpd_str = test.metric.tiempos_por_distancia or '' %}
+                {% if tpd_str %}
+                    {% set tpd = tpd_str | from_json %}
+                    {% for marker, tiempo in tpd.items() %}
+                    <tr {% if loop.last %}>class="tramo-final"{% endif %}>
+                        <td {% if loop.last %}><strong>0 → {{ marker }}m</strong>{% else %}>0 → {{ marker }}m{% endif %}</td>
+                        <td {% if loop.last %}><strong>{{ tiempo|duration }}</strong>{% else %}>{{ tiempo|duration }}{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    {# Legacy fallback for tests without tiempos_por_distancia #}
                     {% if test.metric.tiempo_50m %}
-                    <tr><td>0 → 50m</td><td>{{ "%.2f"|format(test.metric.tiempo_50m) }}</td></tr>
+                    <tr><td>0 → 50m</td><td>{{ test.metric.tiempo_50m|duration }}</td></tr>
                     {% endif %}
                     {% if test.metric.tiempo_100m %}
-                    <tr><td>0 → 100m</td><td>{{ "%.2f"|format(test.metric.tiempo_100m) }}</td></tr>
+                    <tr><td>0 → 100m</td><td>{{ test.metric.tiempo_100m|duration }}</td></tr>
                     {% endif %}
                     {% if test.metric.tiempo_150m %}
-                    <tr><td>0 → 150m</td><td>{{ "%.2f"|format(test.metric.tiempo_150m) }}</td></tr>
+                    <tr><td>0 → 150m</td><td>{{ test.metric.tiempo_150m|duration }}</td></tr>
                     {% endif %}
-                    <tr><td><strong>200m</strong></td><td><strong>{{ "%.2f"|format(test.metric.tiempo_total) }}</strong></td></tr>
-                </tbody>
+                    <tr><td><strong>0 → {{ test.metric.distancia or 200 }}m</strong></td><td><strong>{{ test.metric.tiempo_total|duration }}</strong></td></tr>
+                {% endif %}
+            </tbody>
             </table>
         </div>
 
@@ -278,13 +292,13 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>Vel. máxima</td><td>{{ "%.2f"|format(test.metric.velocidad_maxima) }} km/h</td></tr>
-                    <tr><td>Vel. media</td><td>{{ "%.2f"|format(test.metric.velocidad_media) }} km/h</td></tr>
+                    <tr><td>Vel. máxima</td><td>{{ test.metric.velocidad_maxima|comma }} km/h</td></tr>
+                    <tr><td>Vel. media</td><td>{{ test.metric.velocidad_media|comma }} km/h</td></tr>
                     {% if test.metric.velocidad_min_post10 %}
-                    <tr><td>Vel. mínima post-10m</td><td>{{ "%.2f"|format(test.metric.velocidad_min_post10) }} km/h</td></tr>
+                    <tr><td>Vel. mínima post-10m</td><td>{{ test.metric.velocidad_min_post10|comma }} km/h</td></tr>
                     {% endif %}
-                    <tr><td>Acel. máxima</td><td>{{ "%.2f"|format(test.metric.aceleracion_max) }} m/s²</td></tr>
-                    <tr><td>0 → 12 km/h</td><td>{{ "%.2f"|format(test.metric.tiempo_12kmh) if test.metric.tiempo_12kmh else '—' }} s</td></tr>
+                    <tr><td>Acel. máxima</td><td>{{ test.metric.aceleracion_max|comma }} m/s²</td></tr>
+                    <tr><td>0 → 12 km/h</td><td>{{ test.metric.tiempo_12kmh|duration if test.metric.tiempo_12kmh else '—' }}</td></tr>
                 </tbody>
             </table>
         </div>
@@ -300,10 +314,10 @@
                 </thead>
                 <tbody>
                     <tr><td>Paladas totales</td><td>{{ test.metric.num_paladas }}</td></tr>
-                    <tr><td>Dist. media/palada</td><td>{{ "%.2f"|format(test.metric.dist_media_palada) }} m</td></tr>
-                    <tr><td>Dist. máxima</td><td>{{ "%.2f"|format(test.metric.dist_max_palada) if test.metric.dist_max_palada else '—' }} m</td></tr>
-                    <tr><td>Dist. mínima (sin la 15 primeras Paladas)</td><td>{{ "%.2f"|format(test.metric.dist_min_palada) if test.metric.dist_min_palada else '—' }} m</td></tr>
-                    <tr><td>Consistencia (std)</td><td>{{ "%.2f"|format(test.metric.dist_std_palada) if test.metric.dist_std_palada > 0 else '—' }} m</td></tr>
+                    <tr><td>Dist. media/palada</td><td>{{ test.metric.dist_media_palada|comma }} m</td></tr>
+                    <tr><td>Dist. máxima</td><td>{{ test.metric.dist_max_palada|comma if test.metric.dist_max_palada else '—' }} m</td></tr>
+                    <tr><td>Dist. mínima (sin la 15 primeras Paladas)</td><td>{{ test.metric.dist_min_palada|comma if test.metric.dist_min_palada else '—' }} m</td></tr>
+                    <tr><td>Consistencia (std)</td><td>{{ test.metric.dist_std_palada|comma if test.metric.dist_std_palada > 0 else '—' }} m</td></tr>
                 </tbody>
             </table>
         </div>

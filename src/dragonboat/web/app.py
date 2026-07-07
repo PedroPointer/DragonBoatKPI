@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from jinja2 import Environment
 
 from dragonboat.config import settings
 from dragonboat.database import init_db
@@ -41,9 +43,16 @@ def on_startup():
     logger.info("Database initialized")
 
 
-# Include routes
-from dragonboat.web.routes import router  # noqa: E402
+# Include routes — also patch Jinja2 env to add the from_json filter
+from dragonboat.web.routes import router, _register_jinja_filters  # noqa: E402
 from dragonboat.web.deportistas_routes import router as deportistas_router  # noqa: E402
+
+# Register global filters on the default Jinja2 environment used by routes.py
+try:
+    _register_jinja_filters()
+except Exception as exc:  # noqa: BLE001
+    logger.warning("Could not register Jinja2 filters at import time: %s", exc)
 
 app.include_router(router)
 app.include_router(deportistas_router)
+

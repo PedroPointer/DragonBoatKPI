@@ -10,9 +10,9 @@ from datetime import datetime
 import pandas as pd
 
 from dragonboat.analysis import (
-    analizar_200m,
+    analizar_tramo,
     cargar_csv,
-    detectar_200m,
+    detectar_tramos,
     detectar_paladas,
     generar_informe_str,
     imprimir_metricas,
@@ -33,9 +33,9 @@ def procesar_archivo(filepath: str) -> None:
     filename = os.path.basename(filepath)
     df = cargar_csv(filepath)
 
-    tramos = detectar_200m(df)
+    tramos = detectar_tramos(df)
     if not tramos:
-        print(f"  [!] No se detectaron tramos de 200m en {filename}")
+        print(f"  [!] No se detectaron tramos válidos (200/500/1000/2000m) en {filename}")
         return
 
     input_dir = settings.resolved_input_dir
@@ -49,12 +49,14 @@ def procesar_archivo(filepath: str) -> None:
     for tramo in tramos:
         start_idx, end_idx = tramo.start_idx, tramo.end_idx
         paladas_info = detectar_paladas(df, start_idx, end_idx)
-        m = analizar_200m(df, start_idx, end_idx, paladas_info)
+        m = analizar_tramo(df, start_idx, end_idx, paladas_info, distancia=tramo.distancia)
         if m is None:
             continue
 
         t11 = m.tiempo_11kmh if m.tiempo_11kmh is not None else 99
-        if not (m.tiempo_total < 85.0 and t11 < 20.0 and m.velocidad_media > 9.0):
+        limite = settings.limite_tiempo_max.get(tramo.distancia, 1500.0)
+        media_check = (tramo.distancia == 2000) or (m.velocidad_media > 9.0)
+        if not (m.tiempo_total < limite and t11 < 20.0 and media_check):
             continue
 
         m.calm_start = tramo.calm_start
@@ -72,6 +74,8 @@ def procesar_archivo(filepath: str) -> None:
             fecha_hora=start_dt,
             tipo="entreno",
             chart_filename=nb,
+            distancia=tramo.distancia,
+            tiempos_por_distancia=m.tiempos_por_distancia,
         )
 
         txt = generar_informe_str(m, idx_valido, start_dt, paladas_info.dist_por_palada)
