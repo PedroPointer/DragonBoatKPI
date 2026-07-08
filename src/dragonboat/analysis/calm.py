@@ -91,11 +91,11 @@ def first_stroke_valley(
             break
 
     slope_str = f"{slope:.4f}" if calm_end > calm_start else "N/A"
-    print(
-        f"    [CALMA] start={start_idx} calm=[{calm_start},{calm_end}] "
-        f"len={calm_end - calm_start} pend={slope_str} ssr={ssr:.3f} "
-        f"baseline={baseline:.2f} noise={calm_noise:.3f} dep_thr={departure_threshold:.2f} "
-        f"catch={catch_idx} valley={valley}"
-    )
+    # print(
+    #     f"    [CALMA] start={start_idx} calm=[{calm_start},{calm_end}] "
+    #     f"len={calm_end - calm_start} pend={slope_str} ssr={ssr:.3f} "
+    #     f"baseline={baseline:.2f} noise={calm_noise:.3f} dep_thr={departure_threshold:.2f} "
+    #     f"catch={catch_idx} valley={valley}"
+    # )
 
     return valley, calm_start, calm_end

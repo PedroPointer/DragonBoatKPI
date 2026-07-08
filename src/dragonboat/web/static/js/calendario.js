@@ -6,6 +6,7 @@ function Calendario(opts) {
         year: opts.year || new Date().getFullYear(),
         month: opts.month || new Date().getMonth() + 1,
         diasConEntrenos: [],
+        diasConCompeticion: [],
         onDiaClick: opts.onDiaClick || function() {}
     };
 
@@ -46,6 +47,9 @@ function Calendario(opts) {
             var classes = ["cal-day"];
             if (state.diasConEntrenos.indexOf(d) !== -1) {
                 classes.push("cal-day--has-data");
+            }
+            if (state.diasConCompeticion.indexOf(d) !== -1) {
+                classes.push("cal-day--has-competencia");
             }
             if (dateStr === todayStr) {
                 classes.push("cal-day--today");
@@ -94,6 +98,7 @@ function Calendario(opts) {
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 state.diasConEntrenos = data.dias || [];
+                state.diasConCompeticion = data.dias_competicion || [];
                 render();
             })
             .catch(function() { render(); });

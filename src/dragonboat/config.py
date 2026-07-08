@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     tolerancia_distancia: dict[int, float] = {
         200: 0.15,   # ±30m   -> [170, 230]
         500: 0.10,   # ±50m   -> [450, 550]
-        1000: 0.05,  # ±50m   -> [950, 1050]
+        1000: 0.10,  # ±50m   -> [950, 1050]
         2000: 0.10,  # ±200m  -> [1800, 2200]
     }
     limite_tiempo_max: dict[int, float] = {

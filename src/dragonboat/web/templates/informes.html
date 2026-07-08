@@ -101,7 +101,7 @@
 
 {% if recent_uploads %}
 <div class="card">
-    <h2>Informes de subidas</h2>
+    <h2>Informes de subidos</h2>
     <div class="table-mobile-scroll">
     <table>
         <thead>
@@ -114,9 +114,10 @@
             </tr>
         </thead>
         <tbody>
+            {% set offset = (page - 1) * 10 %}
             {% for u in recent_uploads %}
             <tr>
-                <td>{{ loop.index }}</td>
+                <td>{{ offset + loop.index }}</td>
                 <td style="word-break: break-all; max-width: 240px;">{{ u.filename }}</td>
                 <td style="white-space: nowrap;">{{ u.fecha_datos.strftime("%d/%m/%y %H:%M") if u.fecha_datos else '—' }}</td>
                 <td>
@@ -149,6 +150,10 @@
                             Ir a registro
                         </a>
                         {% endif %}
+                        <button type="button" class="menu-item-danger"
+                                onclick="eliminarUpload({{ u.id }}, '{{ u.filename | e }}')">
+                            Eliminar
+                        </button>
                     </div>
                 </td>
             </tr>
@@ -165,6 +170,21 @@
         </tbody>
     </table>
     </div>
+    {% if total > 10 %}
+    <div class="pagination-bar">
+        {% if page > 1 %}
+        <a href="/informes?pagina={{ page - 1 }}" class="btn btn-secondary small">← Anterior</a>
+        {% else %}
+        <span class="btn btn-secondary small" disabled style="opacity: 0.4; cursor: default;">← Anterior</span>
+        {% endif %}
+        <span class="pagination-info">Página {{ page }} de {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="/informes?pagina={{ page + 1 }}" class="btn btn-secondary small">Siguiente →</a>
+        {% else %}
+        <span class="btn btn-secondary small" disabled style="opacity: 0.4; cursor: default;">Siguiente →</span>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 {% else %}
 <div class="card">
@@ -287,5 +307,17 @@
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeAllMenus();
     });
+
+    // ── Delete upload ──
+    function eliminarUpload(uploadId) {
+        if (!confirm('¿Eliminar este upload y todas sus pruebas?')) return;
+        fetch('/informes/eliminar-upload/' + uploadId, {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) location.reload();
+                else alert('Error: ' + (data.error || 'no se pudo eliminar'));
+            })
+            .catch(() => alert('Error de conexión'));
+    }
 </script>
 {% endblock %}

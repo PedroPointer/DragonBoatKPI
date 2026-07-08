@@ -54,6 +54,7 @@ from dragonboat.repo import (
     update_test_type,
     delete_test_type,
     get_dias_con_entrenamientos,
+    get_dias_con_competicion,
     list_crew,
     get_assignments,
 )
@@ -210,30 +211,14 @@ async def registros_dias(year: int = None, month: int = None):
     year = year or now.year
     month = month or now.month
     dias = get_dias_con_entrenamientos(year, month)
-    return JSONResponse({"dias": dias})
+    dias_competicion = get_dias_con_competicion(year, month)
+    return JSONResponse({"dias": dias, "dias_competicion": dias_competicion})
 
 
 @router.get("/registros/{prueba_id}", response_class=HTMLResponse)
 async def sesion_detail(request: Request, prueba_id: int):
     """Detail view of a single prueba (sesion). Redirect to test page."""
     return RedirectResponse(url=f"/test/{prueba_id}", status_code=302)
-
-
-@router.post("/registros/{prueba_id}")
-async def sesion_update(
-    request: Request,
-    prueba_id: int,
-    tipo: str = Form(None),
-    boat_id: int = Form(None),
-):
-    update_sesion(prueba_id, tipo=tipo, boat_id=boat_id)
-    return RedirectResponse(url=f"/test/{prueba_id}", status_code=302)
-
-
-@router.post("/registros/{prueba_id}/delete")
-async def sesion_delete(prueba_id: int):
-    delete_sesion(prueba_id)
-    return RedirectResponse(url="/registros", status_code=302)
 
 
 @router.post("/registros/new")
@@ -246,6 +231,7 @@ async def registro_nuevo(
     categoria: str = Form(""),
     tipo: str = Form(""),
     fecha: str = Form(""),
+    test_number: str = Form(None),
 ):
     try:
         tiempo_s = _parse_tiempo(tiempo)
@@ -264,6 +250,15 @@ async def registro_nuevo(
         except ValueError:
             pass
 
+    # Use the provided test_number from the form, or auto-assign the next one
+    if test_number and test_number.strip():
+        next_num = int(test_number)
+    else:
+        from sqlalchemy import func as _func
+        with db_session() as _s:
+            _max_num = _s.query(_func.max(Sesion.test_number)).scalar()
+            next_num = (_max_num + 1) if _max_num is not None else 1
+
     crear_sesion_manual(
         custom_name=custom_name.strip() or None,
         distancia=distancia,
@@ -273,8 +268,28 @@ async def registro_nuevo(
         categoria=categoria.strip() or None,
         tipo=tipo.strip() or None,
         fecha_hora=fecha_hora,
+        test_number=next_num,
     )
 
+    return RedirectResponse(url="/registros", status_code=302)
+
+
+@router.post("/registros/{prueba_id}")
+async def sesion_update(
+    request: Request,
+    prueba_id: int,
+    tipo: str = Form(None),
+    boat_id: int = Form(None),
+    test_number: str = Form(None),
+):
+    parsed_test_number = int(test_number) if test_number and test_number.strip() else None
+    update_sesion(prueba_id, tipo=tipo, boat_id=boat_id, test_number=parsed_test_number)
+    return RedirectResponse(url=f"/test/{prueba_id}", status_code=302)
+
+
+@router.post("/registros/{prueba_id}/delete")
+async def sesion_delete(prueba_id: int):
+    delete_sesion(prueba_id)
     return RedirectResponse(url="/registros", status_code=302)
 
 
@@ -350,13 +365,16 @@ async def test_update(
     categoria: str = Form(None),
     boat_id: int = Form(None),
     tipo: str = Form(None),
+    test_number: str = Form(None),
 ):
+    parsed_test_number = int(test_number) if test_number and test_number.strip() else None
     update_sesion(
         test_id,
         custom_name=custom_name.strip() if custom_name else None,
         categoria=categoria or None,
         boat_id=boat_id,
         tipo=tipo or None,
+        test_number=parsed_test_number,
     )
     return RedirectResponse(url=f"/test/{test_id}", status_code=302)
 
@@ -447,16 +465,29 @@ async def test_chart_png(test_id: int):
 # ── Informes ──
 
 @router.get("/informes", response_class=HTMLResponse)
-async def informes_page(request: Request):
+async def informes_page(request: Request, pagina: int = 1):
+    page_data = get_recent_uploads(page=pagina)
     return templates.TemplateResponse(
         name="informes.html",
         request=request,
         context={
             "active_nav": "informes",
             "distancias_validas": settings.distancias_validas,
-            "recent_uploads": get_recent_uploads(limit=5),
+            "recent_uploads": page_data["uploads"],
+            "page": page_data["page"],
+            "total_pages": max(1, -(-page_data["total"] // page_data["per_page"])),
+            "total": page_data["total"],
         },
     )
+
+
+@router.post("/informes/eliminar-upload/{csv_id}")
+async def eliminar_upload(csv_id: int):
+    """Delete a CSV upload and all its associated data (cascade)."""
+    ok = delete_csv_upload(csv_id)
+    if not ok:
+        return JSONResponse({"error": "No se encontró el upload"}, status_code=404)
+    return JSONResponse({"ok": True})
 
 
 @router.post("/informes/upload", response_class=HTMLResponse)

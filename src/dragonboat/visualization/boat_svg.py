@@ -140,9 +140,9 @@ def render_boat_svg(
 
     # ── Labels ──
     parts.append(f'<text x="{CX}" y="{hull_y0 - 65}" text-anchor="middle" '
-                 f'font-size="12" fill="#94a3b8" font-weight="bold">PROA</text>')
+                 f'font-size="14" fill="#94a3b8" font-weight="bold">PROA</text>')
     parts.append(f'<text x="{CX}" y="{hull_y1 + 60}" text-anchor="middle" '
-                 f'font-size="12" fill="#94a3b8" font-weight="bold">POPA</text>')
+                 f'font-size="14" fill="#94a3b8" font-weight="bold">POPA</text>')
 
     # ── Tambor (proa) ──
     tambor_y = PROA_H + 8

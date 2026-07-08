@@ -605,10 +605,10 @@ a:hover {
         rgba(251, 191, 36, 0.14) 0%,
         rgba(251, 191, 36, 0.06) 50%,
         rgba(251, 191, 36, 0.14) 100%);
-    box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.50);
 }
 #tabla-registros tbody tr.row-tipo-competicion {
     box-shadow: 0 0 14px rgba(251, 191, 36, 0.20);
+    border-bottom: 1px solid rgba(251, 191, 36, 0.50);
 }
 #tabla-registros tbody tr.row-tipo-competicion:hover td {
     background: rgba(251, 191, 36, 0.20);
@@ -1414,6 +1414,31 @@ body.no-scroll {
     color: var(--color-text-muted);
     font-size: 0.8rem;
     font-style: italic;
+}
+.menu-dots-dropdown .menu-item-danger {
+    color: var(--color-danger) !important;
+    border-top: 1px solid var(--color-border-light);
+    margin-top: 0.25rem;
+    padding-top: 0.6rem;
+}
+.menu-dots-dropdown .menu-item-danger:hover {
+    background: rgba(244, 63, 94, 0.15) !important;
+    color: #fda4af !important;
+}
+
+/* Pagination bar for /informes upload table */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 0.75rem;
+}
+.pagination-info {
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
 }
 
 @media (max-width: 600px) {

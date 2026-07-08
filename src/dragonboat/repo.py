@@ -171,12 +171,13 @@ def crear_sesion_manual(
     categoria: str | None = None,
     tipo: str | None = None,
     fecha_hora: datetime | None = None,
+    test_number: int | None = None,
 ) -> Sesion:
     with get_session() as s:
         sesion = Sesion(
             csv_upload_id=None,
             fecha_hora=fecha_hora or datetime.now(),
-            test_number=None,
+            test_number=test_number,
             custom_name=custom_name,
             tipo=tipo,
             boat_id=boat_id,
@@ -261,6 +262,7 @@ def update_sesion(
     categoria: Optional[str] = None,
     boat_id: Optional[int] = None,
     tipo: Optional[str] = None,
+    test_number: Optional[int] = None,
 ) -> Optional[Sesion]:
     with get_session() as s:
         sesion = s.query(Sesion).filter(Sesion.id == prueba_id).first()
@@ -274,6 +276,8 @@ def update_sesion(
             sesion.boat_id = boat_id
         if tipo is not None:
             sesion.tipo = tipo
+        if test_number is not None:
+            sesion.test_number = test_number
         s.commit()
         s.refresh(sesion)
         return sesion
@@ -369,12 +373,22 @@ def get_ranking(
         ]
 
 
-# ── Recent CSV Uploads ──
+# ── Recent CSV Uploads (with pagination) ──
 
-def get_recent_uploads(limit: int = 5) -> list[dict]:
-    """Return the latest N CSV uploads with per-upload aggregated info.
+def get_recent_uploads(page: int = 1, per_page: int = 10) -> dict:
+    """Return paginated CSV uploads with per-upload aggregated info.
 
-    Each entry includes:
+    Args:
+        page: 1-based page number.
+        per_page: items per page (default 10).
+
+    Returns a dict:
+        - uploads: list of upload dicts for the current page
+        - page: current page number
+        - per_page: items per page
+        - total: total number of csv_uploads in the database
+
+    Each upload dict includes:
       - id, filename, uploaded_at
       - fecha_datos: earliest fecha_hora of the sesiones (day of the GPS recording)
       - num_pruebas: total count of sesiones in this upload
@@ -384,19 +398,26 @@ def get_recent_uploads(limit: int = 5) -> list[dict]:
       - report_exists: True if the .txt file is still on disk
     Ordered by uploaded_at DESC (newest first).
     """
+    from math import ceil
+
     with get_session() as s:
+        total = s.query(CsvUpload).count()
+
         uploads = (
             s.query(CsvUpload)
             .options(selectinload(CsvUpload.sesiones))
             .order_by(desc(CsvUpload.uploaded_at))
-            .limit(limit)
+            .offset((page - 1) * per_page)
+            .limit(per_page)
             .all()
         )
 
-        result: list[dict] = []
+        upload_list: list[dict] = []
         for u in uploads:
             sesiones = list(u.sesiones)
-            conteo = {d: 0 for d in settings.distancias_validas}
+            conteo: dict[int, int] = {}
+            for d in settings.distancias_validas:
+                conteo[d] = 0
             for ses in sesiones:
                 d = ses.distancia if ses.distancia in settings.distancias_validas else 200
                 conteo[d] = conteo.get(d, 0) + 1
@@ -406,9 +427,6 @@ def get_recent_uploads(limit: int = 5) -> list[dict]:
                 .order_by(Sesion.test_number)
                 .first()
             )
-            # The "data date" is the day the GPS recording happened
-            # (earliest fecha_hora across this upload's sesiones),
-            # NOT the administrative upload date.
             fecha_datos = None
             for ses in sesiones:
                 if ses.fecha_hora is None:
@@ -419,7 +437,7 @@ def get_recent_uploads(limit: int = 5) -> list[dict]:
             report_filename = f"Informe_{base}.txt"
             report_path = settings.resolved_output_dir / report_filename
             report_exists = report_path.is_file()
-            result.append({
+            upload_list.append({
                 "id": u.id,
                 "filename": u.filename,
                 "uploaded_at": u.uploaded_at,
@@ -430,7 +448,13 @@ def get_recent_uploads(limit: int = 5) -> list[dict]:
                 "report_filename": report_filename,
                 "report_exists": report_exists,
             })
-        return result
+
+        return {
+            "uploads": upload_list,
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+        }
 
 
 def get_boat_stats() -> list[dict]:
@@ -759,6 +783,25 @@ def get_dias_con_entrenamientos(year: int, month: int) -> list[int]:
                 cast(func.strftime("%Y", Sesion.fecha_hora), Integer) == year,
                 cast(func.strftime("%m", Sesion.fecha_hora), Integer) == month,
                 Sesion.metric != None,
+            )
+            .distinct()
+            .order_by("dia")
+            .all()
+        )
+        return [r.dia for r in results]
+
+
+def get_dias_con_competicion(year: int, month: int) -> list[int]:
+    """Return list of days in the given month that have sesiones of tipo competición."""
+    with get_session() as s:
+        results = (
+            s.query(
+                cast(func.strftime("%d", Sesion.fecha_hora), Integer).label("dia")
+            )
+            .filter(
+                cast(func.strftime("%Y", Sesion.fecha_hora), Integer) == year,
+                cast(func.strftime("%m", Sesion.fecha_hora), Integer) == month,
+                Sesion.tipo == "competicion",
             )
             .distinct()
             .order_by("dia")

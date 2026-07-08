@@ -89,6 +89,17 @@
 .cal-day--has-data:hover {
     background: #065f46;
 }
+.cal-day--has-competencia {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+    cursor: pointer;
+    font-weight: bold;
+    border: 1px solid rgba(251, 191, 36, 0.5);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+}
+.cal-day--has-competencia:hover {
+    background: rgba(251, 191, 36, 0.3);
+}
 .cal-day--empty { background: transparent; }
 
 .filtros-bar {
@@ -260,6 +271,10 @@
                             <option value="{{ d }}">{{ d }}m</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    <div class="field">
+                        <label>Número</label>
+                        <input type="number" name="test_number" placeholder="Auto" min="1" style="max-width: 100px;">
                     </div>
                     <div class="field">
                         <label>Barco</label>
