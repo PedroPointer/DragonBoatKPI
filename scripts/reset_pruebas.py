@@ -26,14 +26,14 @@ from dragonboat.database import engine, get_session
 from dragonboat.db_models import (
     Sesion,
     TestMetric,
-    TestGpsData,
+    GpsData,
     CrewAssignment,
     CsvUpload,
 )
 
 # Tablas a truncar (orden importa por las FKs)
 TABLES_TO_TRUNCATE = [
-    "test_gps_data",
+    "gps_data",
     "crew_assignments",
     "test_metrics",
     "sesiones",
@@ -151,14 +151,14 @@ def main():
         n_ses = s.query(Sesion).count()
         n_tm = s.query(TestMetric).count()
         n_ca = s.query(CrewAssignment).count()
-        n_gps = s.query(TestGpsData).count()
+        n_gps = s.query(GpsData).count()
         n_csv = s.query(CsvUpload).count()
 
     print("\n--- Verificación ---")
     print(f"  Sesiones:           {n_ses}")
     print(f"  TestMetrics:        {n_tm}")
     print(f"  CrewAssignments:    {n_ca}")
-    print(f"  TestGpsData:        {n_gps}")
+    print(f"  GpsData:            {n_gps}")
     print(f"  CsvUploads:         {n_csv}")
     print("\nListo. Re-subí los CSV desde /informes para regenerar los informes.")
 

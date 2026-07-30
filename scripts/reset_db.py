@@ -2,21 +2,20 @@
 
 Usage: python scripts/reset_db.py
 
-Drops:  sesiones, test_metrics, crew_assignments, csv_uploads
-Keeps:  boats, crew_members, categories
+Drops:  gps_data, crew_assignments, test_metrics, csv_uploads, sesiones
+Keeps:  boats, crew_members, categories, test_types, distancias, app_settings
 
 After running, re-upload CSVs from /informes to repopulate.
 """
 
 from dragonboat.database import engine, init_db
-from dragonboat.db_models import Base
 
 TABLES_TO_DROP = [
-    "test_gps_data",
+    "gps_data",
     "crew_assignments",
     "test_metrics",
-    "sesiones",
     "csv_uploads",
+    "sesiones",
 ]
 
 
@@ -24,11 +23,15 @@ def main():
     from sqlalchemy import text
     with engine.connect() as conn:
         for table in TABLES_TO_DROP:
-            conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
-            print(f"  Dropped table: {table}")
+            conn.execute(text(f"DELETE FROM {table}"))
+            try:
+                conn.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{table}'"))
+            except Exception:  # noqa: BLE001
+                pass
+            print(f"  Cleared: {table}")
         conn.commit()
 
-    print("\nRecreating all tables...")
+    print("\nRecreating tables (if missing) and reseeding catalogs...")
     init_db()
     print("Done. Database is clean. Re-upload CSVs from /informes to repopulate.")
 
