@@ -8,7 +8,12 @@ from __future__ import annotations
 import os
 from datetime import datetime
 
-from dragonboat.analysis._utils import fmt, format_duration
+from dragonboat.analysis._utils import (
+    calcular_sectores,
+    fmt,
+    format_duration,
+    resumen_paladas,
+)
 from dragonboat.config import settings
 from dragonboat.models import Metricas, PaladasInfo
 
@@ -44,47 +49,43 @@ def nombre_base(m: Metricas, idx: int, start_dt: datetime) -> str:
     )
 
 
+def _format_sector_line(s: dict, is_first: bool) -> str:
+    """Render one sector dict as a bullet line, matching the report layout."""
+    t_sector = format_duration(s["t_sector"]) if s["t_sector"] is not None else "—"
+    t_acum = format_duration(s["t_acum"])
+    vel = fmt(s["vel"]) if s["vel"] is not None else "—"
+    if is_first:
+        return f"• 0 a {s['to']}m: {t_sector} ({vel}km/h)"
+    return f"• {s['from']} a {s['to']}m: {t_sector} ({vel}km/h) {t_acum}"
+
+
 def generar_informe_str(
     m: Metricas,
     idx: int,
     start_dt: datetime,
-    dist_por_palada: list[float],
+    dist_por_palada: list[float] | None = None,
 ) -> str:
-    """Generate the text report block for a single training test."""
+    """Generate the text report block for a single training test.
+
+    `dist_por_palada` is optional; the values needed from it are derived here
+    via `resumen_paladas()`. The same helper is used to populate the web view
+    from the persisted `paladas_detalle` column.
+    """
     d = m.distancia
-    step = d / 4.0
     vel_media_ms = m.velocidad_media / 3.6
     acel_g = m.aceleracion_max / 9.81
     std_str = fmt(m.dist_std_palada, 2) if m.dist_std_palada > 0 else "N/A"
     test_time = m.tiempo_total
 
-    # Build sector lines from tiempos_por_distancia
+    sectores = calcular_sectores(m.tiempos_por_distancia, d)
     sector_lines: list[str] = []
-    keys = [str(int(step * i)) for i in range(1, 5)]
-    for i, k in enumerate(keys):
-        t = m.tiempos_por_distancia.get(k)
-        if t is not None:
-            if i == 0:
-                v = (step / t) * 3.6
-                sector_lines.append(
-                    f"• 0 a {k}m: {format_duration(t)} ({fmt(v)}km/h)"
-                )
-            else:
-                prev_key = keys[i - 1]
-                prev_t = m.tiempos_por_distancia.get(prev_key)
-                if prev_t is not None:
-                    seg_t = t - prev_t
-                    seg_d = step
-                    v = (seg_d / seg_t) * 3.6
-                    sector_lines.append(
-                        f"• {prev_key} a {k}m: {format_duration(seg_t)} ({fmt(v)}km/h) {format_duration(t)}"
-                    )
-                else:
-                    sector_lines.append(f"• {k}m: {format_duration(t)}")
+    for i, s in enumerate(sectores):
+        sector_lines.append(_format_sector_line(s, is_first=(i == 0)))
 
-    dist_max = max(dist_por_palada) if dist_por_palada else 0
-    dist_min = min(dist_por_palada) if dist_por_palada else 0
-    dist_min_sin10 = min(dist_por_palada[10:]) if len(dist_por_palada) > 10 else 0
+    resumen = resumen_paladas(dist_por_palada)
+    dist_max = resumen["max_all"] or 0
+    dist_min = resumen["min_salida"] or 0
+    dist_min_sin10 = resumen["min_sin10"] or 0
 
     lines = [
         f"*Dragon Boat - {d}m *",
@@ -138,4 +139,5 @@ def generar_resumen_sesion(
         return header + "\n(Sin pruebas válidas detectadas)\n"
 
     return header + "\n\n" + ("\n\n" + sep + "\n\n").join(body_blocks) + "\n"
+
 

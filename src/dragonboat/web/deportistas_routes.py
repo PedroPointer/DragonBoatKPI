@@ -20,7 +20,6 @@ from dragonboat.repo import (
     crear_crew_member,
     update_crew_member,
     delete_crew_member,
-    get_sesion,
     get_assignments,
     save_assignments,
     list_categories,

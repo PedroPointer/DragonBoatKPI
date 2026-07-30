@@ -9,6 +9,10 @@
 </nav>
 {% endblock %}
 
+{% block extra_head %}
+<script src="/static/vendor/echarts.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <h1>Informes</h1>
 
@@ -22,70 +26,77 @@
 </div>
 {% endif %}
 
-{% if resumen %}
+{% if resumenes %}
+{% for r in resumenes %}
+{% if r.estado == "ok" %}
 <div class="card" style="border: 1px solid #2dd4bf; background: rgba(20, 83, 45, 0.25);">
     <h2 style="color: #5eead4; margin-top: 0;">✓ Análisis completado</h2>
-    <p style="margin-bottom: 0.5rem;">CSV: <strong>{{ resumen.csv_filename }}</strong></p>
+{% elif r.estado == "ok_sin_pruebas" %}
+<div class="card" style="border: 1px solid #60a5fa; background: rgba(30, 58, 138, 0.25);">
+    <h2 style="color: #93c5fd; margin-top: 0;">ℹ CSV registrado (sin pruebas)</h2>
+{% elif r.estado == "duplicado" %}
+<div class="card" style="border: 1px solid #facc15; background: rgba(133, 77, 14, 0.30);">
+    <h2 style="color: #fde68a; margin-top: 0;">⚠ Archivo duplicado</h2>
+{% else %}
+<div class="card" style="border: 1px solid #f87171; background: rgba(127, 29, 29, 0.30);">
+    <h2 style="color: #fca5a5; margin-top: 0;">✗ Error al procesar</h2>
+{% endif %}
+    <p style="margin-bottom: 0.5rem;">CSV: <strong>{{ r.csv_filename }}</strong></p>
+    {% if r.mensaje %}
+    <p style="color: #cbd5e1;">{{ r.mensaje }}</p>
+    {% endif %}
+    {% if r.estado == "ok" %}
     <div class="stats-grid">
         {% for d in distancias_validas %}
         <div class="stat-card">
             <div class="label">{{ d }}m</div>
-            <div class="value" style="color: #5eead4; font-size: 1.5rem;">{{ resumen.conteo_distancias.get(d, 0) }}</div>
+            <div class="value" style="color: #5eead4; font-size: 1.5rem;">{{ r.conteo_distancias.get(d, 0) }}</div>
             <div class="sub">prueba(s)</div>
         </div>
         {% endfor %}
     </div>
     <p style="margin-top: 1rem;">
-        Total: <strong style="color: #86efac;">{{ resumen.total_pruebas }}</strong> prueba(s)
+        Total: <strong style="color: #86efac;">{{ r.total_pruebas }}</strong> prueba(s)
     </p>
-    {% if resumen.report_filename %}
-    <p>Informe generado: <strong style="font-family: Consolas, monospace;">{{ resumen.report_filename }}</strong></p>
+    <div id="barChart_{{ loop.index }}" style="width: 100%; height: 220px; margin-top: 0.75rem;"></div>
+    <script type="application/json" id="barChartData_{{ loop.index }}">
+    {
+        "categories": [{% for d in distancias_validas %}"{{ d }}m"{% if not loop.last %},{% endif %}{% endfor %}],
+        "values": [{% for d in distancias_validas %}{{ r.conteo_distancias.get(d, 0) }}{% if not loop.last %},{% endif %}{% endfor %}]
+    }
+    </script>
+    {% if r.report_filename %}
+    <p>Informe generado: <strong style="font-family: Consolas, monospace;">{{ r.report_filename }}</strong></p>
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem;">
-        <button type="button" class="btn" onclick="toggleReporte('{{ resumen.report_filename }}', 'reporteViewer')">Ver informe</button>
         <a class="btn btn-secondary"
-           href="/informes/reporte/{{ resumen.report_filename }}/download"
+           href="/informes/reporte/{{ r.report_filename }}/download"
            download>Descargar informe</a>
-        {% if resumen.first_sesion_id %}
-        <a class="btn btn-secondary" href="/test/{{ resumen.first_sesion_id }}">Ir a la primera prueba →</a>
+        {% if r.first_prueba_id %}
+        <a class="btn btn-secondary" href="/test/{{ r.first_prueba_id }}">Ir a la primera prueba →</a>
         {% endif %}
     </div>
-    <div id="reporteViewer" style="display: none; margin-top: 1rem;">
-        <pre style="white-space: pre-wrap; font-family: Consolas, monospace; color: #e2e8f0; background: #0f172a; padding: 1rem; border-radius: 8px; max-height: 600px; overflow-y: auto; font-size: 0.85rem; border: 1px solid #334155;" id="reporteContenido">Cargando...</pre>
-    </div>
+    {% endif %}
     {% endif %}
 </div>
-{% endif %}
-
-{% if duplicate_filename %}
-<div class="card" style="background: #854d0e; color: #fde68a; margin-bottom: 1rem;">
-    <p style="margin-bottom: 0.75rem;">
-        El archivo <strong>{{ duplicate_filename }}</strong> ya está registrado.
-        Para reemplazar la sesión anterior, seleccioná el archivo otra vez y confirmá.
-    </p>
-    <form action="/informes/upload?overwrite=1" method="post" enctype="multipart/form-data"
-          style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-        <input type="file" name="file" accept=".csv" id="overwriteFileInput">
-        <button type="submit" class="btn" id="overwriteSubmitBtn" disabled>Reemplazar sesión existente</button>
-    </form>
-</div>
+{% endfor %}
 {% endif %}
 
 <div class="action-card" onclick="document.getElementById('fileInput').click()">
     <div class="action-icon">📄</div>
     <h3>Subir CSV</h3>
-    <p>Arrastra o selecciona un archivo RaceBox Drag para analizar</p>
+    <p>Arrastra o selecciona uno o varios archivos RaceBox Drag para analizar</p>
 </div>
 
 <form id="uploadForm" action="/informes/upload" method="post" enctype="multipart/form-data" style="display: none;">
     <div class="upload-zone" id="dropZone">
         <div class="upload-icon">📄</div>
         <p class="upload-text">
-            Arrastra tu CSV aquí o <strong>haz clic para seleccionar</strong>
+            Arrastra tus CSV aquí o <strong>haz clic para seleccionar</strong>
         </p>
         <p style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem;">
-            Formato: RaceBox Drag (.csv)
+            Formato: RaceBox Drag (.csv) — podés subir varios a la vez
         </p>
-        <input type="file" name="file" id="fileInput" accept=".csv">
+        <input type="file" name="files" id="fileInput" accept=".csv" multiple>
     </div>
     <div style="text-align: center; margin-top: 1rem;">
         <button type="submit" class="btn" id="submitBtn" disabled>Analizar</button>
@@ -101,7 +112,12 @@
 
 {% if recent_uploads %}
 <div class="card">
-    <h2>Informes de subidos</h2>
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <h2 style="margin: 0;">Informes de subidos</h2>
+        <a class="btn btn-secondary small" href="/informes/download-csvs" download>
+            ⬇ Descargar todos los CSV
+        </a>
+    </div>
     <div class="table-mobile-scroll">
     <table>
         <thead>
@@ -114,7 +130,7 @@
             </tr>
         </thead>
         <tbody>
-            {% set offset = (page - 1) * 10 %}
+            {% set offset = 5 + (page - 2) * 10 if page > 1 else 0 %}
             {% for u in recent_uploads %}
             <tr>
                 <td>{{ offset + loop.index }}</td>
@@ -170,7 +186,7 @@
         </tbody>
     </table>
     </div>
-    {% if total > 10 %}
+    {% if total > 5 %}
     <div class="pagination-bar">
         {% if page > 1 %}
         <a href="/informes?pagina={{ page - 1 }}" class="btn btn-secondary small">← Anterior</a>
@@ -223,6 +239,12 @@
     const uploadForm = document.getElementById('uploadForm');
     const loading = document.getElementById('loading');
 
+    function summarizeFiles(files) {
+        if (!files || files.length === 0) return '';
+        if (files.length === 1) return files[0].name;
+        return files.length + ' archivos seleccionados';
+    }
+
     document.querySelector('.action-card').addEventListener('click', function(e) {
         if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A') {
             uploadForm.style.display = 'block';
@@ -235,30 +257,100 @@
     dropZone.addEventListener('drop', function(e) {
         e.preventDefault(); this.classList.remove('dragover');
         if (e.dataTransfer.files.length) {
-            fileInput.files = e.dataTransfer.files;
+            // Construir un DataTransfer nuevo y asignar al input (necesario para múltiples)
+            const dt = new DataTransfer();
+            for (const f of e.dataTransfer.files) dt.items.add(f);
+            fileInput.files = dt.files;
             submitBtn.disabled = false;
-            this.querySelector('.upload-text strong').textContent = e.dataTransfer.files[0].name;
+            this.querySelector('.upload-text strong').textContent = summarizeFiles(fileInput.files);
         }
     });
     fileInput.addEventListener('change', function() {
-        if (this.files.length) { submitBtn.disabled = false; dropZone.querySelector('.upload-text strong').textContent = this.files[0].name; }
+        if (this.files.length) { submitBtn.disabled = false; dropZone.querySelector('.upload-text strong').textContent = summarizeFiles(this.files); }
     });
-    uploadForm.addEventListener('submit', function() { submitBtn.disabled = true; loading.classList.add('active'); });
+    uploadForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var files = fileInput.files;
+        if (!files || files.length === 0) return;
 
-    // Overwrite file input
-    const overwriteInput = document.getElementById('overwriteFileInput');
-    const overwriteBtn = document.getElementById('overwriteSubmitBtn');
-    if (overwriteInput) {
-        overwriteInput.addEventListener('change', function() {
-            if (this.files.length) { overwriteBtn.disabled = false; }
+        var filenames = [];
+        for (var i = 0; i < files.length; i++) filenames.push(files[i].name);
+
+        submitBtn.disabled = true;
+        loading.classList.add('active');
+        loading.querySelector('p').textContent = 'Verificando archivos...';
+
+        fetch('/informes/check-duplicates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filenames: filenames })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var dups = data.duplicates || [];
+            if (dups.length > 0) {
+                var msg = 'Los siguientes archivos ya existen:\n\n';
+                dups.forEach(function(n) { msg += '  • ' + n + '\n'; });
+                msg += '\n¿Reemplazarlos?';
+                if (!confirm(msg)) {
+                    var dt = new DataTransfer();
+                    var kept = 0;
+                    for (var i = 0; i < files.length; i++) {
+                        if (dups.indexOf(files[i].name) === -1) {
+                            dt.items.add(files[i]);
+                            kept++;
+                        }
+                    }
+                    if (kept === 0) {
+                        loading.classList.remove('active');
+                        loading.querySelector('p').textContent = 'Procesando CSV... esto puede tomar unos segundos.';
+                        submitBtn.disabled = false;
+                        alert('No hay archivos nuevos para procesar.');
+                        return;
+                    }
+                    fileInput.files = dt.files;
+                    doSubmit(false);
+                    return;
+                }
+                doSubmit(true);
+            } else {
+                doSubmit(false);
+            }
+        })
+        .catch(function() {
+            if (!confirm('No se pudo verificar si hay archivos duplicados. ¿Continuar de todas formas?')) {
+                loading.classList.remove('active');
+                loading.querySelector('p').textContent = 'Procesando CSV... esto puede tomar unos segundos.';
+                submitBtn.disabled = false;
+                return;
+            }
+            doSubmit(false);
         });
-    }
+
+        function doSubmit(overwrite) {
+            loading.querySelector('p').textContent = 'Procesando CSV... esto puede tomar unos segundos.';
+            var fd = new FormData();
+            for (var i = 0; i < fileInput.files.length; i++) {
+                fd.append('files', fileInput.files[i]);
+            }
+            fetch('/informes/upload' + (overwrite ? '?overwrite=1' : ''), {
+                method: 'POST',
+                body: fd
+            })
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                document.open(); document.write(html); document.close();
+            })
+            .catch(function() {
+                loading.classList.remove('active');
+                loading.querySelector('p').textContent = 'Procesando CSV... esto puede tomar unos segundos.';
+                submitBtn.disabled = false;
+                alert('Error de conexión al procesar los archivos.');
+            });
+        }
+    });
 
     // ── Report viewer (Ver informe) ──
-    // Multiple viewers possible: the upload resumen card and each row of the
-    // "Informes de subidas" table expose a "Ver informe" button.
-    // Each viewer block has IDs `<viewerId>` (the tr wrapper) and
-    // `<viewerId>Contenido` (the <pre>).
     const reportesCargados = {};
     function toggleReporte(filename, viewerId) {
         const viewer = document.getElementById(viewerId + '_row') || document.getElementById(viewerId);
@@ -288,12 +380,9 @@
     function toggleMenuDots(uploadId) {
         const menu = document.getElementById('menuDots_' + uploadId);
         if (!menu) return;
-
-        // Cerrar otros menús abiertos
         const wasOpen = menu.classList.contains('open');
         document.querySelectorAll('.menu-dots-dropdown.open').forEach(m => m.classList.remove('open'));
         if (wasOpen) return;
-
         menu.classList.add('open');
     }
     function closeAllMenus() {
@@ -319,5 +408,42 @@
             })
             .catch(() => alert('Error de conexión'));
     }
+
+    // ── Bar charts: pruebas detectadas por distancia ──
+    document.querySelectorAll('[id^="barChart_"]').forEach(function(container) {
+        if (typeof echarts === 'undefined') return;
+        const idx = container.id.split('_').pop();
+        const dataNode = document.getElementById('barChartData_' + idx);
+        if (!dataNode) return;
+        let data;
+        try { data = JSON.parse(dataNode.textContent); } catch (e) { return; }
+        const chart = echarts.init(container, null, { renderer: 'canvas' });
+        chart.setOption({
+            backgroundColor: 'transparent',
+            grid: { left: 40, right: 16, top: 24, bottom: 32 },
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            xAxis: {
+                type: 'category',
+                data: data.categories,
+                axisLine: { lineStyle: { color: '#94a3b8' } },
+                axisLabel: { color: '#94a3b8', fontSize: 11 }
+            },
+            yAxis: {
+                type: 'value',
+                minInterval: 1,
+                axisLine: { lineStyle: { color: '#94a3b8' } },
+                axisLabel: { color: '#94a3b8', fontSize: 11 },
+                splitLine: { lineStyle: { color: '#334155' } }
+            },
+            series: [{
+                type: 'bar',
+                data: data.values,
+                itemStyle: { color: '#2dd4bf', borderRadius: [4, 4, 0, 0] },
+                barMaxWidth: 56,
+                label: { show: true, position: 'top', color: '#5eead4', fontSize: 12 }
+            }]
+        });
+        window.addEventListener('resize', function() { chart.resize(); });
+    });
 </script>
 {% endblock %}

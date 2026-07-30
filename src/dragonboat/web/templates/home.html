@@ -30,7 +30,7 @@
         </thead>
         <tbody>
             {% for r in ranking %}
-            <tr class="row-link" onclick="window.location='/test/{{ r.sesion_id }}'">
+            <tr class="row-link" onclick="window.location='/test/{{ r.prueba_id }}'">
                 <td><span class="rank {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% endif %}">{{ loop.index }}</span></td>
                 <td><strong>{{ r.custom_name or "—" }}</strong></td>
                 <td><span class="badge {% if r.boat_name == 'DB12' %}db12{% elif r.boat_name == 'DB22' %}db22{% endif %}">{{ r.boat_name or "—" }}</span></td>
@@ -60,8 +60,8 @@
     {% for item in incomplete %}
     <div class="session-card">
         <div class="session-info">
-            <h3>{{ item.sesion.custom_name or "Prueba #" ~ item.sesion.test_number }}</h3>
-            <p>{{ item.sesion.fecha_hora.strftime("%d/%m/%Y") if item.sesion.fecha_hora else '' }}</p>
+            <h3>Sesión {{ item.sesion.fecha.strftime("%d/%m/%Y") if item.sesion.fecha else item.sesion.id }}</h3>
+            <p>{{ item.sesion.num_pruebas }} pruebas · {{ item.sesion.num_archivos }} archivos</p>
             <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 {% for w in item.warnings %}
                 <span class="warning-badge {% if w.type == 'crew' %}danger{% else %}warning{% endif %}">
@@ -71,7 +71,7 @@
                 {% endfor %}
             </div>
         </div>
-        <a href="/test/{{ item.sesion.id }}#tripulacion" class="session-link">Asignar →</a>
+        <a href="/registros?dia={{ item.sesion.fecha.day if item.sesion.fecha else 1 }}&mes={{ item.sesion.fecha.month if item.sesion.fecha else 1 }}&anio={{ item.sesion.fecha.year if item.sesion.fecha else 2026 }}" class="session-link">Ver →</a>
     </div>
     {% endfor %}
 </div>
@@ -79,8 +79,8 @@
 <div class="card">
     <div class="empty-state">
         <span class="empty-icon">✅</span>
-        <h3>Todas las pruebas completas</h3>
-        <p>No hay pruebas pendientes de asignar tripulación</p>
+        <h3>Todas las sesiones completas</h3>
+        <p>No hay sesiones pendientes de asignar tripulación</p>
     </div>
 </div>
 {% endif %}

@@ -14,15 +14,15 @@ Alcance: 100% — incluye gráficas interactivas, mapa GPS, tabla filtrable y ca
 
 | Componente | Tecnología | Forma |
 |------------|------------|-------|
-| Gráficas web | Plotly Python (server-side) | `fig.to_html()` → HTML interactivo embebido |
+| Gráficas web | ECharts (vendored local) | `echarts.init()` + JSON del servidor, sin CDN |
 | Gráficas PDF | matplotlib (se mantiene) | Calidad de impresión, sin interactividad |
 | Mapa GPS | Leaflet.js (CDN) | OpenStreetMap, sin API key |
-| Tabla | DataTables (CDN) + jQuery | Sort/filter/paginación nativo |
+| Tabla | Server-side rendered + row-link | Sin DataTables (eliminado en refactor) |
 | Calendario | Vanilla JS | CSS grid + JS hand-rolled, sin dependencias |
 
-Plotly Python genera HTML+JS interactivo desde el servidor. Reutiliza la lógica
-de `charts.py` sin necesidad de escribir JS para las gráficas.
-Leaflet, DataTables y el calendario son JavaScript client-side liviano.
+ECharts se sirve como archivo local en `static/vendor/echarts.min.js` (sin dependencia de CDN externa).
+El servidor devuelve un JSON con las series 25Hz en `GET /test/{id}/chart-data`.
+Leaflet y el calendario son JavaScript client-side liviano.
 
 ---
 
@@ -30,72 +30,95 @@ Leaflet, DataTables y el calendario son JavaScript client-side liviano.
 
 ### 3.1 Layout general
 
-Dos zonas verticales:
-1. **Parte superior**: calendario mensual
-2. **Parte inferior**: tabla de tests/sesiones
+Cuatro zonas verticales cuando hay sesión del día seleccionado:
+1. **Parte superior**: calendario mensual (vanilla JS)
+2. **Parte media-alta**: mapa GPS Leaflet del día (segmentos moving/stopped + tramos de prueba)
+3. **Parte media-baja**: cabecera de sesión con métricas generales (stat-cards)
+4. **Parte inferior**: tabla de pruebas del día seleccionado
 
-La tabla ocupa todo el ancho. El calendario tiene un ancho máximo de ~400px
-centrado en la parte superior, o se puede hacer responsivo.
+Si no hay día seleccionado con entrenamientos: muestra empty state sugiriendo subir un CSV.
 
 ### 3.2 Calendario (vanilla JS)
 
 **Comportamiento:**
-- Días con entrenamientos (que tienen tests en DB): marcados con badge verde
+- Días con entrenamientos: marcados con badge verde
+- Días con competición: marcados con badge amarillo borde dorado
 - Día actual: marcado con badge gris
+- Día seleccionado: outline azul + fondo cyan
 - Días sin entrenamientos: sin marca
 - Navegación: flechas ◀ ▶ para cambiar de mes
-- Año: input editable a mano debajo del mes
+- Año: input editable a mano
 
 **Interacción:**
-- Al cargar la página: se muestra el mes actual, se llama a `GET /registros/dias?year=X&month=Y`
-- Respuesta JSON: `{dias: [1, 15, 22]}`
-- Click en un día marcado → se filtra la tabla a los tests de ese día
-- Click en un día sin marca → no hace nada (o se limpia el filtro)
+- Al cargar la página: `GET /registros/dias?year=X&month=Y`
+- Respuesta JSON: `{dias: [...], dias_competicion: [...]}`
+- Click en un día marcado → navega a `/registros?dia=X&mes=Y&anio=Z`
 
 **Generación del calendario:**
 - JS calcula primer día del mes, número de días, dibuja grid CSS
 - Sin librerías externas. Archivo: `static/js/calendario.js`
 
-### 3.3 Tabla (vía DataTables)
+### 3.3 Cabecera de sesión (si hay día seleccionado)
+
+Cuando hay sesión del día, se muestra:
+- Título: "Sesión del dd/MM/YYYY"
+- Subtítulo: "{num_pruebas} pruebas · {num_archivos} archivos · {tipo} · {categoria}"
+- **Stats grid** (8 stat-cards):
+  - Distancia total real (highlight, fondo azul) + nominal
+  - Tiempo total (duración GPS)
+  - Tiempo parado (sin moverse)
+  - Tiempo en movimiento (remando)
+  - **% en movimiento (highlight, fondo azul)** — `tiempo_movimiento / tiempo_total_entreno × 100`, formato `N.N%`, "—" si no hay datos
+  - Vel. media en mov.
+  - Vel. máxima del día
+  - Ritmo medio (min/km)
+
+**Mapa de sesión:**
+- Mapa Leaflet con segmentos GPS coloreados por estado (verde = moving, rojo = stopped)
+- Leyenda con 5 categorías de velocidad (0-3, 3-6, 6-9, 9-12, 12-15 km/h)
+- Test segments coloreados por distancia (200m azul, 500m amarillo, 1000m naranja)
+- Botón Minimizar togglea `.minimized` class
+
+### 3.4 Tabla de pruebas del día
 
 **Columnas:**
 
-| Columna | Origen | Ordenable | Filtrable |
-|---------|--------|-----------|-----------|
-| # | test.test_number | Sí | No |
-| Nombre | test.custom_name | Sí | Sí |
-| Tipo | session.tipo | Sí | Sí (select) |
-| Barco | boat.display_name | Sí | Sí (select) |
-| Tiempo | test_metric.tiempo_total | Sí | No |
-| Categoría | test.categoria | Sí | Sí (select) |
-| Fecha | session.fecha | Sí | Sí (input date) |
-| Hora | session.fecha (time) | Sí | No |
-
-**Comportamiento sin filtro:**
-- Orden default: por **fecha descendente** (agrupado por día),
-  dentro del mismo día por **test_number ascendente** (orden de ejecución)
+| Columna | Origen |
+|---------|--------|
+| # | loop.index |
+| Nombre | test.custom_name |
+| Distancia | test.distancia.metros (badge) |
+| Barco | test.boat.name (badge) |
+| Tiempo | test.tiempo_total (formato duration) |
+| Paladas | test.num_paladas |
+| Acciones | Ver / Eliminar |
 
 **Click en fila:**
 - Navega a `GET /test/{id}` (detalle de test)
+- Click en Ver / Eliminar hace `event.stopPropagation()` para no disparar el row click
 
-**Botón "Limpiar filtros":**
-- Resetea todos los filtros de DataTables al estado inicial
+**Eliminación:**
+- `POST /test/{id}/delete` con `confirm('¿Eliminar esta prueba?')`
+- Cascade: borra test_metric, crew_assignments
 
-**Datos iniciales:**
-- La tabla se renderiza en SSR (server-side rendering inicial con Jinja2)
-- DataTables inicializa sobre el HTML existente: `$("#tabla-registros").DataTable()`
-- Las columnas que usan select para filtrar usan `DataTable().column().search()` con inputs custom
+### 3.5 Archivos CSV del día
 
-### 3.4 Endpoints
+Lista de archivos CSV subidos en la sesión con fecha de upload y datos.
+
+### 3.6 Eliminar sesión completa
+
+`POST /sesion/{id}/delete` con `confirm('¿Eliminar esta sesión y todos sus datos? Esta acción no se puede deshacer.')`
+- Borra sesión + cascade (csv_uploads, gps_data, test_metrics, crew_assignments, archivos físicos)
+
+### 3.7 Endpoints
 
 **GET /registros** (HTML):
-- Parámetros opcionales: `?dia=15&mes=6&anio=2026`
-- Si se pasan, la tabla se renderiza filtrada a ese día desde el servidor
-- El JS del calendario puede hacer un fetch y re-renderizar la tabla, o recargar la página con query params
+- Parámetros opcionales: `?dia=15&mes=6&anio=2026&tipo=&barco=`
+- Si se pasan `dia/mes/anio`, se renderiza la sesión de ese día
 
 **GET /registros/dias?year=2026&month=6** → JSON:
 ```json
-{"dias": [1, 15, 22]}
+{"dias": [1, 15, 22], "dias_competicion": [22]}
 ```
 
 ---
@@ -104,21 +127,23 @@ centrado en la parte superior, o se puede hacer responsivo.
 
 La página de detalle de test se reorganiza en 7 bloques verticales:
 
-1. Navegación y cabecera (back link + título + metadatos)
-2. Encabezado de métricas (stat-cards + editar prueba)
-3. Mini-mapa GPS (Leaflet con trayectoria)
-4. Visualizador de carrera (PNG actual + Plotly futuro)
-5. Datos generales de la carrera (3 tablas: tramos, velocidades, paladas)
+1. Breadcrumb navigation + título + metadatos
+2. Encabezado de métricas (stat-cards + botón Editar prueba)
+3. Mini-mapa GPS (Leaflet con trayectoria coloreada por velocidad)
+4. Visualizador de carrera (ECharts interactivo con toggle PNG ↔ Interactivo)
+5. Datos generales de la carrera (formato reporte: sectores D/4, velocidad, paladas)
 6. Tripulación con SVG interactivo (configurador inline)
 7. Eliminar prueba (botón con confirmación)
 
 ---
 
-### 4.1 Navegación y cabecera
+### 4.1 Breadcrumb navigation
 
-**Back link:**
-- `<a href="/registros" class="back-link">← Volver a registros</a>` en la parte superior
-- Navega a `GET /registros`
+**Breadcrumb:**
+- `<nav class="breadcrumb">` con `Home / Registros / Prueba #X`
+- `Home` enlaza a `GET /`
+- `Registros` enlaza a `GET /registros`
+- Último item: texto del título (no es link)
 
 **Título:**
 - `<h1>` con `test.custom_name` si existe
@@ -128,39 +153,39 @@ La página de detalle de test se reorganiza en 7 bloques verticales:
 - `<p class="page-meta">` con `test.boat.display_name` + `test.categoria`
 - Separador ` — ` entre ambos si los dos existen
 
-**Anchor `#tripulacion`:**
-- Dashboard enlaza a `/test/{id}#tripulacion` para scroll directo al card de tripulación
-- `session.html` también enlaza a `/test/{id}#tripulacion`
-
 ---
 
 ### 4.2 Encabezado de métricas
 
-**Layout:** card con título "Métricas" + tiempo total grande a la derecha.
-- Tiempo total: `{{ "%.2f"|format(test.metric.tiempo_total) }}s`
+**Layout:** card con título "Métricas" + botón "Editar prueba ▾" + tiempo total grande a la derecha.
+- Tiempo total: `{{ test.tiempo_total|duration }}` (formato HH:MM:SS,MM)
 
 **Stat-cards (6, grid auto-fit):**
 | Métrica | Fuente | Unidad |
 |---------|--------|--------|
-| Vel. máxima | test_metric.velocidad_maxima | km/h |
-| Vel. media | test_metric.velocidad_media | km/h |
-| 0 → 12 km/h | test_metric.tiempo_12kmh | s (— si null) |
-| Paladas | test_metric.num_paladas | total |
-| Dist. palada | test_metric.dist_media_palada | m |
-| Consistencia | test_metric.dist_std_palada | m (— si 0) |
+| Vel. máxima | test.velocidad_maxima | km/h |
+| Vel. media | test.velocidad_media | km/h |
+| 0 → 12 km/h | test.tiempo_12kmh | hh:mm:ss,mm (— si null) |
+| Paladas | test.num_paladas | total |
+| Dist. palada | test.dist_media_palada | m |
+| Consistencia | test.dist_std_palada | m (— si 0) |
 
 Formato: mismo estilo que las stat-cards del Dashboard (base.css).
 Grid: `grid-template-columns: repeat(auto-fit, minmax(130px, 1fr))`
 
-**Editar prueba (sub-sección colapsable):**
-- `<details>` con `border-top`, dentro del mismo card
-- `<summary>`: "Editar prueba"
+**Editar prueba (sub-sección OCULTA, toggle con botón):**
+- Botón "Editar prueba ▾" junto al título "Métricas"
+- Al click: `toggleEditarPrueba()` muestra/oculta el panel `#editar-prueba-panel`
+- Texto del botón cambia a "Editar prueba ▴" cuando está abierto
+- Panel tiene `border-top` separador
 - Formulario `POST /test/{id}` en fila con `flex-wrap: wrap`:
   - **Nombre**: `<input type="text" name="custom_name">` con `<datalist>` de nombres existentes
+  - **Número**: `<input type="number" name="test_number">` (Nº)
   - **Barco**: `<select name="boat_id">` con opciones de tabla `boats`
-  - **Categoría**: `<select name="categoria">` con lista fija de categorías
+  - **Categoría**: `<select name="categoria">` con lista de `categories`
+  - **Tipo**: `<select name="tipo">` con opciones de `test_types`
 - Botón "Guardar" (`<button type="submit" class="btn small">`)
-- Acción server-side: `update_sesion()` con valores no vacíos, redirect 302 a `GET /test/{id}`
+- Acción server-side: `update_prueba()` con valores no vacíos, redirect 302 a `GET /test/{id}`
 
 ---
 
@@ -168,20 +193,24 @@ Grid: `grid-template-columns: repeat(auto-fit, minmax(130px, 1fr))`
 
 **Contenido:**
 - Mapa centrado en la trayectoria del barco
-- Polyline con puntos lat/lon del test, color azul (#38bdf8), weight 3
-- Marcador inicio verde (#22c55e, radio 6) con tooltip "Salida"
-- Marcador fin rojo (#ef4444, radio 6) con tooltip "Llegada"
+- **Polilínea coloreada por velocidad**: cada segmento se colorea según la velocidad media
+  - Gradiente de 0 a 15 km/h: rojo → naranja → amarillo → verde claro → verde oscuro
+  - `STOPS = [{0,#ef4444}, {3,#f97316}, {6,#eab308}, {9,#84cc16}, {12,#22c55e}, {15,#10b981}]`
+  - Cada segmento se dibuja entre 2 puntos consecutivos con la velocidad media entre ellos
+- Marcador inicio: flecha `➡` rotada con el bearing de salida + tooltip "Salida"
+- Marcador fin: bandera `🏁` + tooltip "Llegada"
+- Legend en `bottomright` con 5 rangos de velocidad
 - `map.fitBounds(latlngs, {padding: [20, 20]})`
 - `setTimeout(invalidateSize, 200)` post-render para evitar tile glitch
 
 **Interacción:**
-- Botón "Minimizar" / "Mostrar mapa" togglea clase `.minimized`
+- Botón "Minimizar mapa" / "Mostrar mapa" togglea clase `.minimized`
 - CSS: `transition: height 0.3s ease`, `.minimized { height: 0; margin-bottom: 0; }`
 - Zoom y pan nativos de Leaflet
 
 **Datos:**
-- `GET /test/{id}/trajectory` → `{points: [[lat, lon, speed], ...], center: [lat, lon] | null}`
-- Sin `bounds` en la respuesta actual (spec anterior listaba `bounds`, implementación usa `center` + `fitBounds`)
+- `GET /test/{id}/trajectory` → `{points: [[lat, lon, speed], ...], center, gps_inicio, gps_fin}`
+- Points decimados a 5Hz con velocidad
 - Si puntos vacíos o < 2: mensaje "Mapa no disponible — datos GPS no registrados"
 - Si error fetch: mensaje "Mapa no disponible"
 
@@ -189,68 +218,109 @@ Grid: `grid-template-columns: repeat(auto-fit, minmax(130px, 1fr))`
 - CDN Leaflet + CSS en base.html
 - Inicialización en `<script>` inline en test.html (IIFE)
 - `onclick="toggleMapa()"` en el botón
-- Sin dependencia de tiles caros (OSM gratuito)
+- `bearingRad(p1, p2)` calcula el ángulo de la flecha de salida en radianes
 
 ---
 
-### 4.4 Visualizador de carrera
+### 4.4 Visualizador de carrera — ECharts interactivo
 
-**Estado actual — PNG desde matplotlib:**
-- Muestra gráfica generada por `graficar_200m()` como imagen base64 embebida
-- Si `test.metric.chart_filename` existe y PNG está en `data/output/`:
-  `<img src="data:image/png;base64,{{ chart_b64 }}">`
-- Si no: `<p style="color: #64748b; text-align: center;">Gráfica no disponible</p>`
-- No hay interactividad (zoom, pan, hover)
+**Implementado: Apache ECharts 5 + PNG toggle**
 
-**Estado futuro — Plotly interactivo (pendiente implementación):**
-- Reemplazará el PNG cuando se implemente la persistencia de GPS raw
-- 4 subplots sincronizados (eje X compartido):
+El visualizador muestra gráficas interactivas con opción de alternar a PNG. Diseñado
+con prioridad móvil: pinch-to-zoom, arrastre para pan, tooltip sincronizado entre
+paneles y línea roja de salida atravesando los 4 grids a la vez.
 
-  1. **Velocidad (km/h):** línea por segmento (verde acelera / rojo frena), línea media punteada azul, sombreado 0→12 km/h naranja, sombreado últimos 50m rojo, anotaciones 50/100/150m, picos numerados, valles catch, stats box
-  2. **Roll / Balanceo (deg):** barras estribor (#D2691E), babor (#FFB347), inestable (#c0392b), línea 0
-  3. **Pitch / Cabeceo (deg):** barras proa (#6a9ad8), popa (#1a3a8a), línea 0
-  4. **Distancia por palada (m):** barras verde ≥ media / rojo < media, línea media, número en cada barra, estrella mejor palada
+**Ventana temporal visible:** desde **2 segundos antes de la salida** (cuando los
+datos están disponibles) hasta el final del tramo. La **salida (t=0)** se marca con
+una línea vertical roja sólida de 2px de ancho que cruza los 4 paneles sincronizada
+(los ejes X están enlazados vía `xAxisIndex: "all"`).
 
-- Comportamiento: zoom rec sincronizado, pan sincronizado, tooltip hover, doble click reset, export PNG
-- Generación: `graficar_200m_plotly()` en charts.py → `fig.to_html(full_html=False, include_plotlyjs='cdn', div_id='chart-200m')`
-- Endpoints planificados: `GET /test/{id}/raw` y `GET /test/{id}/chart`
-- Ver sección 6 para estado de implementación
+**4 subplots sincronizados** (eje X compartido vía `axisPointer.link`):
+1. **Velocidad (km/h):** línea verde (#27ae60), línea media punteada azul (#3498db) con etiqueta, marcadores dashed de distancia (gris/naranja/rojo según tramo), valles catch como puntos azules (#2980b9), números de pico en cada stroke (1, 2, 3…)
+2. **Roll / Balanceo (deg):** barras estribor (#D2691E), babor (#FFB347), inestable (#c0392b cuando |roll| > 10°)
+3. **Pitch / Cabeceo (deg):** barras proa (#6a9ad8), popa (#1a3a8a)
+4. **Distancia por palada (m):** barras verde ≥ media / rojo < media, línea media roja dashed con etiqueta, ★ dorada en la mejor palada
+
+**Interacción táctil (móvil-first):**
+- **Pellizcar** (dos dedos) → zoom simultáneo en los 4 paneles
+- **Arrastrar** (un dedo) sobre la gráfica → pan
+- **Tocar** → crosshair unificado + tooltip con t, km/h, roll°, pitch° (no valores internos)
+- **Slider inferior** → tiradores táctiles para seleccionar tramos con precisión
+- **Botón "Reset zoom"** → vuelve al rango completo
+- **Doble-tap / wheel** → zoom (desktop)
+
+**UI del visualizador:**
+- Botón "Reset zoom" — vuelve al rango completo
+- Botón "PNG" / "Interactivo" para alternar entre imagen estática y ECharts
+- Panel de checkboxes: Velocidad, Balanceo, Cabeceo, Dist/palada (toggle client-side, sin recarga)
+- Botón "Expandir ⛶" / "Colapsar ⛶" para maximizar la gráfica (llama a `chart.resize()`)
+- Escape para colapsar si está expandido
+- Descarga PNG: botón "Descargar PNG" → `GET /test/{id}/chart.png`
+
+**Endpoints:**
+- `GET /test/{id}/chart-data` → JSON con series (`time`, `speed`, `lean`, `pitch`), eventos (`peak_times`, `peak_speeds`, `valley_times`, `dist_por_palada`) y marcadores (`tiempos_por_distancia`, `velocidad_media`, `velocidad_maxima`, `tiempo_12kmh`, `dist_media_palada`, `tiempo_total`)
+- `GET /test/{id}/chart.png` → imagen PNG descargable (matplotlib, sin cambios)
+
+**Generación:**
+- Series 25Hz: leídas de `gps_data.data_json` (sesión completa del CSV) con slicing por coincidencia exacta de las primeras 5 muestras de velocidad → garantiza 2s previos para tests **existentes** sin migrar DB
+- `pitch` se calcula server-side con `calcular_pitch(gforce_x, gforce_z)` (idéntico a la versión anterior)
+- Render: una instancia ECharts, 4 grids apilados (velocidad ×3 altura, resto ×1), dataZoom `inside` + `slider` enlazado a los 4 ejes X
+
+**Vendor / dependencias:**
+- ECharts 5.5.1 self-hosted en `static/vendor/echarts.min.js` (~1 MB, sin CDN — funciona offline)
+- Plotly eliminado de `base.html` (~1,2 MB menos en TODAS las páginas)
+
+**Estado fallback:**
+- Sin `segment_gps_json`: muestra solo PNG si existe, o "Gráfica no disponible"
+- Sin `gps_data` (pruebas manuales): chart-data degrada a `segment_gps_json` (empieza en t=0, sin tramo negativo; la línea roja sigue funcionando)
 
 ---
 
-### 4.5 Datos generales de la carrera
+### 4.5 Datos generales de la carrera (formato reporte)
 
-Dos columnas con tablas HTML estáticas (sin interactividad).
+Card con título "Datos generales". Estilo "reporte" con jerarquía visual tipo resumen impreso.
 
-**Columna 1 — Tramos:**
-| Tramo | Tiempo (s) |
-|-------|-----------|
-| 0 → 50m | test_metric.tiempo_50m |
-| 0 → 100m | test_metric.tiempo_100m |
-| 0 → 150m | test_metric.tiempo_150m |
-| **200m** | **test_metric.tiempo_total** |
+**Header:**
+- Título: "Dragon Boat - {distancia}m"
+- Fecha: "dd/MM/YYYY HH:MM · Prueba #N"
 
-Filas 50m/100m/150m se muestran solo si tienen valor (`{% if %}`).
+**Tiempo total (highlight):**
+- Caja con border-left azul, icono ⏱️, label "Tiempo total:", valor `{{ test.tiempo_total|duration }}`
 
-**Columna 2 — Velocidades:**
-| Métrica | Valor |
-|---------|-------|
-| Vel. máxima | test_metric.velocidad_maxima km/h |
-| Vel. media | test_metric.velocidad_media km/h |
-| Vel. mínima post-10m | test_metric.velocidad_min_post10 km/h |
-| Acel. máxima | test_metric.aceleracion_max m/s² |
-| 0 → 12 km/h | test_metric.tiempo_12kmh s |
+**Sección 1 — Tiempos por sector (4 splits D/4):**
+Generada por `calcular_sectores(tpd, distancia)` server-side. Cada sector tiene `{from, to, t_sector, t_acum, vel}`.
 
-Fila "Vel. mínima post-10m" solo si tiene valor.
+Ejemplo para 200m (split cada 50m):
+- 0 a 50m: t_sector (vel km/h) t_acum
+- 50 a 100m: t_sector (vel km/h) t_acum
+- 100 a 150m: t_sector (vel km/h) t_acum
+- 150 a 200m: t_sector (vel km/h) t_acum
 
-**Columna 3 — Paladas:**
-| Métrica | Valor |
-|---------|-------|
-| Paladas totales | test_metric.num_paladas |
-| Dist. media/palada | test_metric.dist_media_palada m |
-| Dist. máxima | test_metric.dist_max_palada m (— si null) |
-| Dist. mínima (sin las 15 primeras) | test_metric.dist_min_palada m (— si null) |
-| Consistencia (std) | test_metric.dist_std_palada m (— si 0) |
+Ejemplo para 500m (split cada 125m):
+- 0 a 125m, 125 a 250m, 250 a 375m, 375 a 500m
+
+Línea previa: "Aceleracion 0 a 12 km/h: {tiempo_12kmh|duration}"
+
+**Sección 2 — Velocidad:**
+- Media: {velocidad_media|comma_es} km/h ({velocidad_media/3.6|comma_es} m/s)
+- Maxima: {velocidad_maxima|comma_es} km/h
+- Minima: {velocidad_min_post10|comma_es} km/h (sin 15 primeras) — si tiene valor
+- Acel maxima: {aceleracion_max|comma_es} m/s2 ({aceleracion_max/9.81|comma_es} G)
+
+**Sección 3 — Paladas:**
+- Total: {num_paladas}
+- Distancia por palada: {dist_media_palada|comma_es} m
+- Maxima: {paladas_resumen.max_all|comma_es} m — si hay datos
+- Minima: {paladas_resumen.min_salida|comma_es} m (salida) — si hay datos
+- Minima: {paladas_resumen.min_sin10|comma_es} m (sin 10 primeras) — si hay datos
+- Consistencia: {dist_std_palada|comma_es} m — si > 0
+
+**Jinja filters usados:**
+- `duration` — formato HH:MM:SS,MM
+- `duration_short` — formato MM:SS,CC
+- `comma` — formato N.NN
+- `comma_es` — formato N,NN (estilo español)
+- `from_json` — parsear JSON de string
 
 ---
 
@@ -346,6 +416,10 @@ Botón con confirmación antes de la acción destructiva:
   - Si `csv_upload.kept=True`, el archivo en disco se borra también
 - Redirige a `GET /registros` (302)
 
+Toast notifications (en registros.html):
+- Al eliminar: toast verde "✓ Prueba eliminada" (fixed top-right, autodestrucción 2s)
+- Al guardar tripulación: toast verde "✓ Guardado"
+
 Ruta: `routes.py`:
 ```python
 @router.post("/registros/{prueba_id}/delete")
@@ -423,12 +497,16 @@ Nueva tabla para persistir los datos GPS muestreados de cada test.
 
 | Método | Ruta | Descripción | Respuesta | Estado |
 |--------|------|-------------|-----------|--------|
-| GET | /registros/dias?year=X&month=Y | Días del mes con entrenamientos | JSON: `{dias: [1,15,22]}` | ✅ Implementado |
-| GET | /test/{id}/trajectory | Puntos GPS para el mapa Leaflet | JSON: `{points, center}` | ✅ Implementado (points siempre [] por ahora) |
+| GET | /registros/dias?year=X&month=Y | Días del mes con entrenamientos | JSON: `{dias, dias_competicion}` | ✅ Implementado |
+| GET | /test/{id}/trajectory | Puntos GPS para el mapa Leaflet (con velocidades) | JSON: `{points: [[lat,lon,spd]], center, gps_inicio, gps_fin}` | ✅ Implementado |
+| GET | /test/{id}/chart-data | Series 25Hz + eventos para ECharts | JSON: `{time, speed, lean, pitch, peak_times, ...}` | ✅ Implementado |
+| GET | /test/{id}/chart.png | Descarga PNG de la gráfica | image/png | ✅ Implementado |
 | POST | /test/{id}/crew/json | Guardar asignaciones tripulación inline | JSON: `{ok: true}` | ✅ Implementado |
-| POST | /registros/{prueba_id}/delete | Eliminar prueba con cascade | Redirect 302 /registros | ✅ Implementado |
-| GET | /test/{id}/raw | Datos muestreados para Plotly | JSON completo (ver sección 5) | 🔄 Pendiente |
-| GET | /test/{id}/chart | HTML del visualizador Plotly | HTML parcial (`fig.to_html()`) | 🔄 Pendiente |
+| POST | /test/{id}/delete | Eliminar prueba con cascade | Redirect 302 /registros | ✅ Implementado |
+| GET | /sesion/{id} | Vista de sesión diaria con métricas generales | HTML: sesion.html | ✅ Implementado |
+| POST | /sesion/{id} | Actualizar tipo/categoría de la sesión | Redirect 302 | ✅ Implementado |
+| POST | /sesion/{id}/delete | Eliminar sesión completa (cascade) | Redirect 302 /registros | ✅ Implementado |
+| POST | /sesion/{id}/recalcular | Recalcular agregados de la sesión | Redirect 302 /registros | ✅ Implementado |
 
 ### GET /registros/dias
 
@@ -441,18 +519,19 @@ Nueva tabla para persistir los datos GPS muestreados de cada test.
 
 ### GET /test/{id}/trajectory
 
-**Lógica:** busca `test_gps_data` por test_id, extrae lat/lon/speed
-**Respuesta actual (points siempre vacío — pendiente migración GPS raw):**
-```json
-{"points": [], "center": null}
-```
-**Respuesta futura** (cuando existan datos GPS raw en DB):
+**Lógica:** lee `prueba.segment_gps_json` o `prueba.gps_data.data_json`, decima a 5Hz
+**Respuesta:**
 ```json
 {
   "points": [[38.881733, -6.980930, 2.47], [38.881734, -6.980928, 2.55]],
-  "center": [38.8818, -6.9809]
+  "center": [38.8818, -6.9809],
+  "gps_inicio": {"lat": 38.8817, "lon": -6.9809},
+  "gps_fin": {"lat": 38.8820, "lon": -6.9812}
 }
 ```
+- Points es array de `[lat, lon, speed]` decimado a 5Hz (cada 5 samples)
+- Center es el centroide del mapa o null si no hay datos
+- gps_inicio/gps_fin vienen de `prueba.gps_inicio` y `prueba.gps_fin`
 
 ### POST /test/{id}/crew/json
 
@@ -473,15 +552,42 @@ Nueva tabla para persistir los datos GPS muestreados de cada test.
 **Lógica:** `delete_sesion()` — borra sesión, metric, assignments (cascade); si era última del csv_upload, borra csv_upload y archivo
 **Respuesta:** Redirect 302 a `/registros`
 
-### GET /test/{id}/raw (pendiente)
+### GET /test/{id}/chart-data (implementado)
 
-**Lógica:** busca `test_gps_data` por test_id, retorna el JSON completo
-**Respuesta:** el JSON de la sección 5 (time, speed, lean, gforce_x, gforce_z, lat, lon, peak_times, peak_speeds, valley_times, dist_por_palada)
+**Lógica:** lee `segment_gps_json` (eventos: picos, valles, dist/palada) +
+`gps_data.data_json` (series 25Hz completas de la sesión) + fila de la prueba
+(marcadores y métricas). Localiza el inicio del tramo en la sesión completa por
+coincidencia exacta de las primeras 5 muestras de velocidad, y devuelve las series
+desde `start_t − 2s` (cuando los datos están disponibles) hasta el fin del tramo,
+con tiempos relativos a la salida (t=0).
 
-### GET /test/{id}/chart (pendiente)
+**Respuesta:** JSON
+```json
+{
+  "time": [-2.0, -1.96, ..., 0, 0.04, ..., 45.8],
+  "speed": [0.5, 0.6, ..., 12.0, 12.1, ..., 14.2],
+  "lean": [...],
+  "pitch": [...],
+  "time_start": -2.0,
+  "time_end": 45.8,
+  "tiempo_total": 45.8,
+  "velocidad_media": 13.5,
+  "velocidad_maxima": 17.2,
+  "tiempo_12kmh": 4.2,
+  "peak_times": [0.7, 1.4, 2.1, ...],
+  "peak_speeds": [13.1, 14.2, 14.8, ...],
+  "valley_times": [0.4, 1.05, 1.75, ...],
+  "dist_por_palada": [3.1, 3.3, 3.0, ...],
+  "tiempos_por_distancia": {"50": 4.5, "100": 9.2, "150": 14.1, "200": 18.7},
+  "dist_media_palada": 3.2,
+  "num_paladas": 28
+}
+```
 
-**Lógica:** genera la gráfica Plotly con los datos raw, retorna HTML
-**Respuesta:** `text/html` con el div Plotly + script (para incrustar vía AJAX o iframe)
+### GET /test/{id}/chart.png (implementado)
+
+**Lógica:** genera la gráfica PNG con matplotlib, retorna imagen
+**Respuesta:** `image/png` — descarga en nueva pestaña
 
 ---
 
@@ -493,10 +599,10 @@ Nueva tabla para persistir los datos GPS muestreados de cada test.
 - NO hay datos GPS raw en DB
 
 ### Proceso de migración
-1. **Script `scripts/reset_tests.py`** que:
-   - Trunca las tablas: `tests`, `test_metrics`, `crew_assignments`, `test_gps_data`
+1. **Script `scripts/reset_db.py`** que:
+   - Trunca las tablas: `sesiones`, `test_metrics`, `crew_assignments`, `test_gps_data`
    - Elimina archivos PNG en `data/output/`
-   - Mantiene `boats`, `crew_members`, `categories` intactos
+   - Mantiene `boats`, `crew_members`, `categories`, `test_types` intactos
 2. **Subir CSV de nuevo** desde `POST /informes/upload`
 3. El nuevo flujo genera:
    - GPS raw → `test_gps_data`
@@ -518,57 +624,75 @@ Nueva tabla para persistir los datos GPS muestreados de cada test.
 | Archivo | Contenido |
 |---------|-----------|
 | `src/dragonboat/web/static/js/calendario.js` | Generación y navegación del calendario mensual |
-| `src/dragonboat/web/static/js/registros.js` | Inicialización de DataTables + coordinación calendario-tabla |
+| `src/dragonboat/web/static/js/registros.js` | Init de registros.html (toast notifications, etc.) |
+| `src/dragonboat/web/static/vendor/echarts.min.js` | ECharts library self-hosted (~1 MB, sin CDN) |
 | `src/dragonboat/web/templates/boat_hull_db12.svg.j2` | SVG lateral barco DB12 con seat-markers (12 palistas) |
 | `src/dragonboat/web/templates/boat_hull_db22.svg.j2` | SVG lateral barco DB22 con seat-markers (22 palistas) |
+| `src/dragonboat/web/templates/sesion.html` | Vista de sesión diaria con métricas generales + tabla de pruebas + archivos CSV + acciones de edición/eliminación |
 | `src/dragonboat/web/deportistas_routes.py` | CRUD tripulantes + endpoints crew assignment |
 | `src/dragonboat/web/static/img/barcoDB12.svg` | SVG de referencia para DB12 |
 | `src/dragonboat/web/static/img/barcoDB22.svg` | SVG de referencia para DB22 |
-| `scripts/reset_tests.py` | Borra tests existentes para migración |
+| `src/dragonboat/web/static/img/barcoDragon.svg` | SVG decorativo |
+| `src/dragonboat/web/static/img/home_24dp.svg` | Icono Home |
+| `src/dragonboat/web/static/img/iconoDragon.svg` | Icono Dragon |
+| `src/dragonboat/web/static/img/add_circle_24dp.svg` | Icono agregar |
+| `src/dragonboat/tools/backfill_sectores_paladas.py` | Backfill: pobla `sectores_detalle` y `paladas_detalle` en filas existentes |
+| `scripts/reset_db.py` | Reset destructivo de tests/metrics/assignments/GPS |
 
 ### Modificados
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/dragonboat/db_models.py` | Añadir `TestGPSData` model |
-| `src/dragonboat/migrations.py` | Nueva tabla |
-| `src/dragonboat/repo.py` | Añadir `crear_test_gps_data()`, `get_test_gps_data()`, `get_dias_con_entrenamientos()`, `list_crew_by_frequency()` |
-| `src/dragonboat/web/routes.py` | Añadir rutas: `/registros/dias`, `/test/{id}/trajectory`, `/test/{id}/crew/json`, `/test/{id}/raw` (pendiente), `/test/{id}/chart` (pendiente) |
-| `src/dragonboat/web/deportistas_routes.py` | Añadir ruta `GET /test/{id}/crew` redirect a `/test/{id}#tripulacion`, `POST /test/{id}/crew/json` |
-| `src/dragonboat/visualization/charts.py` | Añadir `graficar_200m_plotly()` usando Plotly Python (pendiente implementación completa) |
-| `src/dragonboat/web/templates/base.html` | Añadir CDNs: Plotly.js (futuro), Leaflet, DataTables, jQuery |
-| `src/dragonboat/web/templates/registros.html` | Rediseño completo: calendario + tabla |
-| `src/dragonboat/web/templates/test.html` | Rediseño completo: 7 bloques, SVG interactivo tripulación (sin Plotly, usa PNG base64) |
-| `src/dragonboat/web/templates/dashboard.html` | Link "Asignar →" apunta a `/test/{id}#tripulacion` |
-| `src/dragonboat/web/templates/session.html` | Eliminada (reemplazada por redirect a `/test/{id}`) |
-| `pyproject.toml` | Añadir `plotly>=5.20` a dependencias |
+| `src/dragonboat/db_models.py` | Añadir `AppSetting`, `Distancia`, `GpsData`, `TestType`, columna `sectores_detalle` y `paladas_detalle` en `TestMetric` |
+| `src/dragonboat/repo.py` | Añadir `calcular_sectores()`, `resumen_paladas()`, `get_trajectory()`, `classify_gps_segments()`, CRUD TestType y Distancia |
+| `src/dragonboat/analysis/_utils.py` | `format_duration`, `format_duration_short`, `calcular_sectores`, `resumen_paladas` |
+| `src/dragonboat/analysis/loader.py` | `cargar_csv`, `build_gps_data_json`, `build_gps_inicio_fin`, `get_trajectory`, `classify_gps_segments`, `downsample_5hz` |
+| `src/dragonboat/analysis/metrics.py` | `analizar_tramo`, `analizar_200m`, `calcular_pitch` |
+| `src/dragonboat/analysis/detection.py` | `detectar_tramos`, `detectar_200m` |
+| `src/dragonboat/analysis/strokes.py` | `detectar_paladas`, `detectar_picos` |
+| `src/dragonboat/analysis/report.py` | `generar_informe_str`, `generar_resumen_sesion`, `nombre_base`, `imprimir_metricas` |
+| `src/dragonboat/web/routes.py` | Reescrito: home, registros, sesion CRUD, test CRUD, trajectory, chart-data, chart.png, informes, config (incluye distancias y umbral), 4 endpoints API |
+| `src/dragonboat/web/deportistas_routes.py` | `POST /deportistas/{id}/edit` para edición inline |
+| `src/dragonboat/visualization/charts.py` | Solo `graficar_200m()` (PNG con matplotlib); `graficar_200m_plotly()` eliminado |
+| `src/dragonboat/web/templates/base.html` | Removido CDN de Plotly; ECharts se carga local desde `/static/vendor/echarts.min.js` |
+| `src/dragonboat/web/templates/registros.html` | Rediseño completo: calendario + sesión del día + mapa con leyenda + tabla de pruebas |
+| `src/dragonboat/web/templates/test.html` | Rediseño completo: ECharts interactivo, SVG tripulación, breadcrumb, edit form oculto con toggle |
+| `src/dragonboat/web/templates/home.html` | Rankings por distancia con `prueba_id` + sesiones incompletas |
+| `src/dragonboat/web/templates/informes.html` | Upload CSV + reportes con paginación + descarga ZIP de CSVs |
+| `src/dragonboat/web/templates/config.html` | 6 secciones: Barcos, Categorías, Tipos, Distancias, Umbral, Telegram |
+| `pyproject.toml` | Eliminado `plotly>=5.20` de dependencias |
+
+### Eliminados
+
+| Archivo | Razón |
+|---------|-------|
+| `src/dragonboat/migrations.py` | No existe — se usa reset_db.py |
+| `src/dragonboat/web/static/js/dataTables.js` | DataTables eliminado del refactor (tabla server-side) |
+| `src/dragonboat/visualization/charts.py::graficar_200m_plotly` | Reemplazado por ECharts client-side |
 
 ---
 
-## 9. Dependencias nuevas
+## 9. Dependencias
 
 ### Python (pip)
-- `plotly>=5.20` — generación de gráficas interactivas server-side
+- `pandas`, `numpy`, `scipy` — procesamiento de CSV
+- `matplotlib` — gráficas PNG
+- `sqlalchemy>=2.0`, `aiosqlite` — ORM
+- `fastapi`, `jinja2` — web framework
+- `pillow` — fotos de tripulantes
 
-### CDN (sin install, en base.html)
-- `plotly.js` — renderizado cliente de las gráficas generadas
+### Vendored (sin install, en `static/vendor/`)
+- `echarts.min.js` (~1 MB) — renderizado cliente de las gráficas interactivas
+- Cargado en `test.html` con `<script src="/static/vendor/echarts.min.js"></script>`
+
+### CDN (sin install, en `base.html`)
 - `leaflet.js` + `leaflet.css` — mapa GPS
-- `jquery.js` — requerido por DataTables
-- `datatables.js` + `datatables.css` — tabla interactiva
 
-### Versiones CDN sugeridas
+### Versiones CDN usadas
 ```html
-<!-- Plotly -->
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-
 <!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- jQuery + DataTables -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.11/css/jquery.dataTables.min.css" />
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.11/js/jquery.dataTables.min.js"></script>
 ```
 
 ---
@@ -577,21 +701,28 @@ Nueva tabla para persistir los datos GPS muestreados de cada test.
 
 | Decisión | Valor | Razón |
 |----------|-------|-------|
-| Gráficas web | Plotly Python server-side | Reutiliza lógica de charts.py, interactivo sin JS |
+| Gráficas web | ECharts 5 (vendored) | Interactividad rica, sin dependencia de CDN, offline-first |
 | Gráficas PDF/impresión | matplotlib (se mantiene) | Calidad vectorial, sin interactividad |
 | Mapa GPS | Leaflet.js (CDN) | Estándar open-source, sin API key |
-| Tabla filtrable | DataTables (CDN) + jQuery | Sort/filter/paginación nativo, ~1 línea JS |
+| Mapa coloreado por velocidad | 6 stops de gradiente (rojo→verde) | Visualización clara de zonas rápidas/lentas |
+| Tabla pruebas | Server-side render (sin DataTables) | Sin dependencia, fila con click + botones de acción |
 | Calendario | Vanilla JS | Full control visual, sin dependencia |
-| GPS raw en DB | JSON completo 25Hz en `test_gps_data.data_json` | Todos los puntos del sensor, ~150KB/test, sin pérdida de datos |
-| Tests existentes | Se borran (script reset_tests.py) | Empezar de 0, validar subida limpia |
-| CDNs | Versiones fijas en base.html | Evitar roturas por actualizaciones automáticas |
-| Plotly caching | Se regenera cada request desde raw data | Rápido (<100ms), sin complejidad de caché |
-| SVG barco | Vista lateral con seat-markers invisibles | El usuario diseñó la vista lateral en dragon.html; seat-markers garantizan alineación perfecta |
+| GPS raw en DB | JSON 25Hz en `gps_data.data_json` | Todos los puntos del sensor, ~150KB por CSV |
+| Cálculo pitch server-side | `calcular_pitch(gforce_x, gforce_z)` | Reducir trabajo del cliente |
+| Sectores pre-calculados | `sectores_detalle` columna JSON | 4 splits D/4 sin recalcular en cada render |
+| Paladas detalle pre-calculadas | `paladas_detalle` columna JSON | max/min por categorías sin recalcular |
+| Backfill script | `dragonboat.tools.backfill_sectores_paladas` | Idempotente, rellena filas existentes |
+| Tests existentes | Se borran (script reset_db.py) | Empezar de 0, validar subida limpia |
+| Plotly eliminado | Reemplazado por ECharts client-side | -1.2 MB en TODAS las páginas, mejor UX móvil |
+| ECharts vendored | `static/vendor/echarts.min.js` | Offline-first, sin 404 si CDN falla |
+| SVG barco | Vista lateral con seat-markers invisibles | El usuario diseñó la vista lateral; seat-markers garantizan alineación perfecta |
 | Configurador tripulación | Inline en test.html (no página separada) | UX más rápida: click + asignar sin navegación |
 | Dropdown tripulación | `position: fixed` a nivel body, z-index 99999 | Soluciona clipping por overflow del contenedor SVG |
 | Orden tripulantes | Por frecuencia de uso (freq DESC) | Los más usados aparecen primero, reduce búsqueda |
 | Búsqueda type-ahead | NFD + strip combining chars | Acentos españoles (é, í, ó, etc.) no deben romper la búsqueda |
 | Visualización sin foto | Iniciales en círculo #334155 | Consistente con placeholder de deportistas |
 | Labels asiento vacío | E{row}/B{row} / Tambor / Timonel | Identificación rápida sin tener que contar filas |
-| Gráfica de carrera (actual) | PNG base64 embebido | Sin build step ni CDN adicional, funcional desde el inicio |
-| Gráfica de carrera (futuro) | Plotly server-side vía `GET /test/{id}/chart` | Interactividad completa cuando existan datos GPS raw |
+| Edit prueba | Toggle "Editar prueba ▾" con panel oculto | Card de métricas más limpia por defecto |
+| Distancia | CRUD dinámico (distancias) | Soporte multi-distancia |
+| Tipos de prueba | CRUD dinámico (test_types) | Permite agregar tipos sin cambiar código |
+| Sesión diaria | Template dedicado (sesion.html) con métricas agregadas | Vista de "día completo" complementaria al detalle de prueba individual |

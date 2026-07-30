@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Sesión {{ sesion.fecha.strftime("%d/%m/%Y") if sesion.fecha else sesion.id }} — Dragon Boat Analyzer{% endblock %}
+
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="/"><img src="/static/img/home_24dp.svg" alt="" class="breadcrumb-icon"> Home</a>
+    <span class="separator">/</span>
+    <a href="/registros"><img src="/static/img/iconoDragon.svg" alt="" class="breadcrumb-icon"> Registros</a>
+    <span class="separator">/</span>
+    <span class="current">Sesión {{ sesion.fecha.strftime("%d/%m/%Y") if sesion.fecha else sesion.id }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>Sesión del {{ sesion.fecha.strftime("%d/%m/%Y") if sesion.fecha else "—" }}</h1>
+<p class="page-meta">
+    {{ sesion.num_pruebas }} pruebas · {{ sesion.num_archivos }} archivos
+    {% if sesion.tipo %} · {{ sesion.tipo }}{% endif %}
+    {% if sesion.categoria %} · {{ sesion.categoria }}{% endif %}
+</p>
+
+{# ── Métricas generales del entreno ── #}
+<div class="card">
+    <h2>Métricas generales del entreno</h2>
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+        <div class="stat-card">
+            <div class="label">Distancia total</div>
+            <div class="value">{% if sesion.distancia_total_real %}{{ "%.0f"|format(sesion.distancia_total_real) }}m{% else %}—{% endif %}</div>
+            <div class="sub">{% if sesion.distancia_total_nominal %}nominal: {{ sesion.distancia_total_nominal }}m{% endif %}</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Tiempo total</div>
+            <div class="value">{% if sesion.tiempo_total_entreno %}{{ "%.0f"|format(sesion.tiempo_total_entreno) }}s{% else %}—{% endif %}</div>
+            <div class="sub">duración GPS</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Tiempo parado</div>
+            <div class="value">{% if sesion.tiempo_parado is not none %}{{ "%.0f"|format(sesion.tiempo_parado) }}s{% else %}—{% endif %}</div>
+            <div class="sub">sin moverse</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Tiempo en movimiento</div>
+            <div class="value">{% if sesion.tiempo_movimiento is not none %}{{ "%.0f"|format(sesion.tiempo_movimiento) }}s{% else %}—{% endif %}</div>
+            <div class="sub">remando</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Vel. media en mov.</div>
+            <div class="value">{% if sesion.vel_media_movimiento is not none %}{{ "%.2f"|format(sesion.vel_media_movimiento) }}{% else %}—{% endif %}</div>
+            <div class="sub">km/h</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Vel. máxima del día</div>
+            <div class="value">{% if sesion.vel_max_dia is not none %}{{ "%.2f"|format(sesion.vel_max_dia) }}{% else %}—{% endif %}</div>
+            <div class="sub">km/h</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Ritmo medio</div>
+            <div class="value">{% if sesion.ritmo_medio is not none %}{{ "%.2f"|format(sesion.ritmo_medio) }}{% else %}—{% endif %}</div>
+            <div class="sub">min/km</div>
+        </div>
+    </div>
+</div>
+
+{# ── Pruebas del día ── #}
+<div class="card">
+    <h2>Pruebas de velocidad</h2>
+    {% if pruebas %}
+    <div class="table-mobile-scroll">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Distancia</th>
+                <th>Barco</th>
+                <th>Tiempo</th>
+                <th>Paladas</th>
+                <th>Tripulación</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in pruebas %}
+            <tr class="row-link" onclick="window.location='/test/{{ p.id }}'">
+                <td>{{ loop.index }}</td>
+                <td>{{ p.custom_name or "—" }}</td>
+                <td><span class="badge info">{{ p.distancia.metros if p.distancia else '?' }}m</span></td>
+                <td>{% if p.boat %}<span class="badge {% if p.boat.name == 'DB12' %}db12{% elif p.boat.name == 'DB22' %}db22{% endif %}">{{ p.boat.name }}</span>{% else %}—{% endif %}</td>
+                <td>{{ p.tiempo_total|duration }}</td>
+                <td>{{ p.num_paladas }}</td>
+                <td>{% set crew_count = p.crew_assignments|length %}{{ crew_count }} {% if crew_count > 0 %}🧑‍🦱{% else %}🚫{% endif %}</td>
+                <td>
+                    <a href="/test/{{ p.id }}" class="btn small" onclick="event.stopPropagation()">Ver</a>
+                    <form action="/test/{{ p.id }}/delete" method="post"
+                          style="display: inline;"
+                          onclick="event.stopPropagation()"
+                          onsubmit="return confirm('¿Eliminar esta prueba?')">
+                        <button type="submit" class="btn-danger">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding: 1.5rem 1rem;">
+        <span class="empty-icon" style="font-size: 2rem;">⏱️</span>
+        <p>Esta sesión no tiene pruebas de velocidad detectadas. Solo se registró el GPS del entreno.</p>
+    </div>
+    {% endif %}
+</div>
+
+{# ── Archivos CSV del día ── #}
+<div class="card">
+    <h2>Archivos CSV</h2>
+    {% if sesion.csv_uploads %}
+    <ul style="list-style: none; padding: 0;">
+        {% for c in sesion.csv_uploads %}
+        <li style="padding: 0.5rem 0; border-bottom: 1px solid #334155;">
+            <strong>{{ c.filename }}</strong>
+            <span style="color: #64748b; font-size: 0.8rem;">
+                · subido {{ c.uploaded_at.strftime("%d/%m/%Y %H:%M") if c.uploaded_at else "—" }}
+                {% if c.metadata_date %} · datos {{ c.metadata_date.strftime("%d/%m/%Y %H:%M") }}{% endif %}
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p style="color: #64748b;">No hay archivos CSV en esta sesión.</p>
+    {% endif %}
+</div>
+
+{# ── Editar día ── #}
+<div class="card">
+    <h2>Editar día</h2>
+    <form action="/sesion/{{ sesion.id }}" method="post" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
+        <div class="field">
+            <label>Categoría (genérica del día)</label>
+            <select name="categoria">
+                <option value="">— Categoría —</option>
+                {% for c in categorias %}
+                <option value="{{ c.name }}" {% if sesion.categoria == c.name %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label>Tipo (genérico del día)</label>
+            <select name="tipo">
+                <option value="">— Tipo —</option>
+                {% for t in tipos %}
+                <option value="{{ t.name }}" {% if sesion.tipo == t.name %}selected{% endif %}">{{ t.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn small">Guardar día</button>
+        <button type="submit" formaction="/sesion/{{ sesion.id }}/recalcular" class="btn btn-secondary small">Recalcular métricas</button>
+    </form>
+</div>
+
+{# ── Eliminar día ── #}
+<div class="card" style="border: 1px solid #b91c1c;">
+    <h2 style="color: #fca5a5;">Eliminar sesión</h2>
+    <p style="color: #94a3b8;">Borra esta sesión y todos sus datos: CSVs, GPS, pruebas, tripulación, archivos físicos.</p>
+    <form action="/sesion/{{ sesion.id }}/delete" method="post" onsubmit="return confirm('¿Eliminar esta sesión y todos sus datos? Esta acción no se puede deshacer.')">
+        <button type="submit" class="btn-danger">Eliminar sesión completa</button>
+    </form>
+</div>
+{% endblock %}

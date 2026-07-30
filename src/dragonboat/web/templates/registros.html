@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Registros — Dragon Boat Analyzer{% endblock %}
 {% block extra_head %}
-<link rel="stylesheet" href="/static/base.css">
 <style>
 #calendario-container {
     max-width: 380px;
@@ -101,23 +100,71 @@
     background: rgba(251, 191, 36, 0.3);
 }
 .cal-day--empty { background: transparent; }
+.cal-day--selected {
+    outline: 2px solid #38bdf8;
+    outline-offset: 1px;
+    background: rgba(56, 189, 248, 0.25) !important;
+    color: #38bdf8 !important;
+    font-weight: bold;
+}
 
-.filtros-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.stat-card--highlight {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    border: 1px solid #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+}
+.stat-card--highlight .value {
+    color: #38bdf8;
+    font-size: 1.4rem;
+}
+
+.mapa-legend .dot-test {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+.dot-test--200 { background: #3b82f6; }
+.dot-test--500 { background: #eab308; }
+.dot-test--1000 { background: #f97316; }
+
+.mapa-container {
+    height: 350px;
+    border-radius: 8px;
+    overflow: hidden;
     margin-bottom: 1rem;
-    flex-wrap: wrap;
+    transition: height 0.3s ease;
+}
+.mapa-container.minimized {
+    height: 0;
+    margin-bottom: 0;
+}
+.mapa-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
     gap: 0.5rem;
 }
-.filtros-bar .badge-info {
+.mapa-legend {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.75rem;
     color: #94a3b8;
-    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
 }
+.mapa-legend .dot {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+.dot-moving { background: #22c55e; }
+.dot-stopped { background: #ef4444; }
 
 .row-link { cursor: pointer; }
 .row-link:hover td { background: #263548; }
-.row-link td:last-child { color: #64748b; font-size: 0.85rem; }
 
 .btn-danger {
     background: #b91c1c;
@@ -131,43 +178,10 @@
 }
 .btn-danger:hover { background: #991b1b; }
 
-/* DataTables overrides for dark theme */
-.dataTables_wrapper .dataTables_filter input,
-.dataTables_wrapper .dataTables_length select {
-    background: #0f172a;
-    color: #e2e8f0;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 0.3rem 0.5rem;
-}
-.dataTables_wrapper .dataTables_filter input:focus,
-.dataTables_wrapper .dataTables_length select:focus {
-    border-color: #38bdf8;
-    outline: none;
-}
-.dataTables_wrapper .dataTables_info,
-.dataTables_wrapper .dataTables_length label {
-    color: #94a3b8;
-    font-size: 0.85rem;
-}
-.dataTables_wrapper .dataTables_paginate .paginate_button {
-    color: #94a3b8 !important;
-    background: transparent !important;
-    border: 1px solid #334155 !important;
-    border-radius: 4px;
-    margin: 0 2px;
-    padding: 0.3rem 0.6rem !important;
-    font-size: 0.8rem;
-}
-.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
-    color: #38bdf8 !important;
-    background: #1e3a5f !important;
-    border-color: #38bdf8 !important;
-}
-.dataTables_wrapper .dataTables_paginate .paginate_button.current {
-    color: #38bdf8 !important;
-    background: #1e293b !important;
-    border-color: #38bdf8 !important;
+.empty-day {
+    padding: 2rem;
+    text-align: center;
+    color: #64748b;
 }
 </style>
 {% endblock %}
@@ -188,26 +202,82 @@
     <div id="calendario"></div>
 </div>
 
+{% if sesion %}
 <div class="card">
-    <div class="filtros-bar">
-        <h2 style="margin-bottom: 0;">Historial</h2>
-        <div>
-                    <span class="badge badge-info" id="filtro-info">
-                {% if request.query_params.dia %}
-                Mostrando {{ request.query_params.dia }}/{{ request.query_params.mes }}/{{ request.query_params.anio }}
-                {% else %}
-                Mostrando todos los registros
-                {% endif %}
-            </span>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <button class="btn small" onclick="openModal('modal-registro')">Añadir +</button>
-                <button class="btn small btn-secondary" onclick="limpiarFiltros()">Limpiar filtros</button>
-            </div>
+    <div class="mapa-controls">
+        <span class="mapa-legend">
+            <span><span class="dot dot-moving"></span>en movimiento</span>
+            <span><span class="dot dot-stopped"></span>parado (&lt; {{ umbral|default(5.0) }} km/h)</span>
+            <span><span class="dot dot-test dot-test--200"></span>200m</span>
+            <span><span class="dot dot-test dot-test--500"></span>500m</span>
+            <span><span class="dot dot-test dot-test--1000"></span>1000m</span>
+        </span>
+        <button class="btn small btn-secondary" onclick="toggleMapaRegistros()" id="btn-mapa-registros">Minimizar</button>
+    </div>
+    <div id="mapa-registros"
+         class="mapa-container"
+         data-segments='{{ gps_segments_json | safe }}'
+         data-test-segments='{{ test_segments_json | safe }}'></div>
+</div>
+
+<div class="card">
+    <h2>Sesión del {{ sesion.fecha.strftime("%d/%m/%Y") if sesion.fecha else "—" }}</h2>
+    <p class="page-meta">
+        {{ sesion.num_pruebas }} pruebas · {{ sesion.num_archivos }} archivos
+        {% if sesion.tipo %} · {{ sesion.tipo }}{% endif %}
+        {% if sesion.categoria %} · {{ sesion.categoria }}{% endif %}
+    </p>
+
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+        <div class="stat-card stat-card--highlight">
+            <div class="label">Distancia total real</div>
+            <div class="value">{% if sesion.distancia_total_real %}{{ "%.0f"|format(sesion.distancia_total_real) }}m{% else %}—{% endif %}</div>
+            <div class="sub">{% if sesion.distancia_total_nominal %}nominal: {{ sesion.distancia_total_nominal }}m{% endif %}</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Tiempo total</div>
+            <div class="value">{% if sesion.tiempo_total_entreno %}{{ sesion.tiempo_total_entreno|duration }}{% else %}—{% endif %}</div>
+            <div class="sub">duración GPS</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Tiempo parado</div>
+            <div class="value">{% if sesion.tiempo_parado is not none %}{{ sesion.tiempo_parado|duration }}{% else %}—{% endif %}</div>
+            <div class="sub">sin moverse</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Tiempo en movimiento</div>
+            <div class="value">{% if sesion.tiempo_movimiento is not none %}{{ sesion.tiempo_movimiento|duration_short }}{% else %}—{% endif %}</div>
+            <div class="sub">remando</div>
+        </div>
+        {% set pct_mov = (sesion.tiempo_movimiento / sesion.tiempo_total_entreno * 100) if (sesion.tiempo_total_entreno and sesion.tiempo_movimiento is not none) else None %}
+        <div class="stat-card stat-card--highlight">
+            <div class="label">% en movimiento</div>
+            <div class="value">{% if pct_mov is not none %}{{ "%.1f"|format(pct_mov) }}%{% else %}—{% endif %}</div>
+            <div class="sub">del tiempo total</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Vel. media en mov.</div>
+            <div class="value">{% if sesion.vel_media_movimiento is not none %}{{ "%.2f"|format(sesion.vel_media_movimiento) }}{% else %}—{% endif %}</div>
+            <div class="sub">km/h</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Vel. máxima del día</div>
+            <div class="value">{% if sesion.vel_max_dia is not none %}{{ "%.2f"|format(sesion.vel_max_dia) }}{% else %}—{% endif %}</div>
+            <div class="sub">km/h</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Ritmo medio</div>
+            <div class="value">{% if sesion.ritmo_medio is not none %}{{ "%.2f"|format(sesion.ritmo_medio) }}{% else %}—{% endif %}</div>
+            <div class="sub">min/km</div>
         </div>
     </div>
+</div>
 
+{% if pruebas %}
+<div class="card">
+    <h2>Pruebas de velocidad</h2>
     <div class="table-mobile-scroll">
-    <table id="tabla-registros" class="display" style="width:100%; color: #e2e8f0;">
+    <table>
         <thead>
             <tr>
                 <th>#</th>
@@ -215,25 +285,22 @@
                 <th>Distancia</th>
                 <th>Barco</th>
                 <th>Tiempo</th>
-                <th>Categoría</th>
-                <th>Fecha</th>
-                <th>Hora</th>
-                <th>Eliminar</th>
+                <th>Paladas</th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
-            {% for r in rows %}
-            <tr class="row-link row-tipo-{{ r.tipo or 'entreno' }}" data-tipo="{{ r.tipo or '' }}" onclick="window.location='/test/{{ r.prueba_id }}'">
-                <td>{{ r.numero }}</td>
-                <td>{{ r.nombre or "—" }}</td>
-                <td><span class="badge info">{{ r.distancia }}m</span></td>
-                <td>{% if r.barco %}<span class="badge {% if r.barco == 'DB12' %}db12{% elif r.barco == 'DB22' %}db22{% endif %}">{{ r.barco }}</span>{% else %}—{% endif %}</td>
-                <td>{% if r.tiempo != None %}{{ r.tiempo|duration }}{% else %}—{% endif %}</td>
-                <td>{% if r.categoria %}<span class="badge">{{ r.categoria }}</span>{% else %}—{% endif %}</td>
-                <td>{{ r.fecha.strftime("%d/%m/%Y") if r.fecha else "—" }}</td>
-                <td>{{ r.hora }}</td>
+            {% for p in pruebas %}
+            <tr class="row-link" onclick="window.location='/test/{{ p.id }}'">
+                <td>{{ loop.index }}</td>
+                <td>{{ p.custom_name or "—" }}</td>
+                <td><span class="badge info">{{ p.distancia.metros if p.distancia else '?' }}m</span></td>
+                <td>{% if p.boat %}<span class="badge {% if p.boat.name == 'DB12' %}db12{% elif p.boat.name == 'DB22' %}db22{% endif %}">{{ p.boat.name }}</span>{% else %}—{% endif %}</td>
+                <td>{{ p.tiempo_total|duration }}</td>
+                <td>{{ p.num_paladas }}</td>
                 <td>
-                    <form action="/registros/{{ r.prueba_id }}/delete" method="post"
+                    <a href="/test/{{ p.id }}" class="btn small" onclick="event.stopPropagation()">Ver</a>
+                    <form action="/test/{{ p.id }}/delete" method="post"
                           style="display: inline;"
                           onclick="event.stopPropagation()"
                           onsubmit="return confirm('¿Eliminar esta prueba?')">
@@ -246,80 +313,53 @@
     </table>
     </div>
 </div>
-
-<div class="modal-overlay" id="modal-registro" onclick="if(event.target===this) closeModal('modal-registro')">
-    <div class="modal">
-        <div class="modal-header">
-            <h3>Añadir registro manual</h3>
-            <button type="button" class="modal-close" onclick="closeModal('modal-registro')" aria-label="Cerrar">×</button>
-        </div>
-        <form action="/registros/new" method="post">
-            <div class="modal-body">
-                <div class="form-row">
-                    <div class="field">
-                        <label>Nombres</label>
-                        <input type="text" name="custom_name" placeholder="Nombre del registro" list="manualNames">
-                        <datalist id="manualNames">
-                            {% for n in names %}<option value="{{ n }}">{% endfor %}
-                        </datalist>
-                    </div>
-                    <div class="field">
-                        <label>Distancia</label>
-                        <select name="distancia" required>
-                            <option value="">— Distancia —</option>
-                            {% for d in distancias_validas %}
-                            <option value="{{ d }}">{{ d }}m</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Número</label>
-                        <input type="number" name="test_number" placeholder="Auto" min="1" style="max-width: 100px;">
-                    </div>
-                    <div class="field">
-                        <label>Barco</label>
-                        <select name="boat_id">
-                            <option value="">— Barco —</option>
-                            {% for b in boats %}
-                            <option value="{{ b.id }}">{{ b.display_name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Tiempo</label>
-                        <input type="text" name="tiempo" placeholder="ej: 01:30,50" required pattern="[0-9:,\.]+" title="Formato: mm:ss,cc (ej: 01:30,50)">
-                    </div>
-                    <div class="field">
-                        <label>Categoría</label>
-                        <select name="categoria">
-                            <option value="">— Categoría —</option>
-                            {% for c in categorias %}
-                            <option value="{{ c }}">{{ c }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Tipo</label>
-                        <select name="tipo">
-                            <option value="">— Tipo —</option>
-                            {% for t in tipos %}
-                            <option value="{{ t.name }}">{{ t.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Fecha</label>
-                        <input type="datetime-local" name="fecha">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-cancel" onclick="closeModal('modal-registro')">Descartar cambios</button>
-                <button type="submit" class="btn">Guardar</button>
-            </div>
-        </form>
+{% else %}
+<div class="card">
+    <h2>Pruebas de velocidad</h2>
+    <div class="empty-day">
+        <span class="empty-icon" style="font-size: 2rem;">⏱️</span>
+        <p>Esta sesión no tiene pruebas de velocidad detectadas. Solo se registró el GPS del entreno.</p>
     </div>
 </div>
+{% endif %}
+
+{% if csv_uploads %}
+<div class="card">
+    <h2>Archivos CSV</h2>
+    <ul style="list-style: none; padding: 0;">
+        {% for c in csv_uploads %}
+        <li style="padding: 0.5rem 0; border-bottom: 1px solid #334155;">
+            <strong>{{ c.filename }}</strong>
+            <span style="color: #64748b; font-size: 0.8rem;">
+                · subido {{ c.uploaded_at.strftime("%d/%m/%Y %H:%M") if c.uploaded_at else "—" }}
+                {% if c.metadata_date %} · datos {{ c.metadata_date.strftime("%d/%m/%Y %H:%M") }}{% endif %}
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="card" style="border: 1px solid #b91c1c;">
+    <h2 style="color: #fca5a5;">Eliminar sesión</h2>
+    <p style="color: #94a3b8;">Borra esta sesión y todos sus datos: CSVs, GPS, pruebas, tripulación, archivos físicos.</p>
+    <form action="/sesion/{{ sesion.id }}/delete" method="post" onsubmit="return confirm('¿Eliminar esta sesión y todos sus datos? Esta acción no se puede deshacer.')">
+        <button type="submit" class="btn-danger">Eliminar sesión completa</button>
+    </form>
+</div>
+
+{% else %}
+<div class="card empty-day">
+    {% if selected_date %}
+    <p>No hay datos para el {{ selected_date.strftime("%d/%m/%Y") }}.</p>
+    <p style="font-size: 0.85rem;">Selecciona otro día con entrenamientos (marcados en verde) en el calendario.</p>
+    {% else %}
+    <p>Aún no hay sesiones registradas.</p>
+    <p style="font-size: 0.85rem;">Sube un CSV desde <a href="/informes" style="color:#38bdf8;">/informes</a> para empezar.</p>
+    {% endif %}
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -331,15 +371,21 @@
     var err = params.get('error');
     if (err) showToast(decodeURIComponent(err), 'error');
 })();
-</script>
-<script>
-Calendario({
-    container: "calendario",
-    onDiaClick: function(day, month, year) {
-        filtrarPorDia(day, month, year);
-        document.getElementById("filtro-info").textContent =
-            "Mostrando " + day + "/" + month + "/" + year;
-    }
-});
+(function() {
+    if (typeof Calendario === 'undefined') return;
+    Calendario({
+        container: "calendario",
+        {% if selected_date %}
+        selectedDay: {{ selected_date.day }},
+        selectedMonth: {{ selected_date.month }},
+        selectedYear: {{ selected_date.year }},
+        {% else %}
+        selectedDay: null,
+        {% endif %}
+        onDiaClick: function(day, month, year) {
+            window.location = "/registros?dia=" + day + "&mes=" + month + "&anio=" + year;
+        }
+    });
+})();
 </script>
 {% endblock %}

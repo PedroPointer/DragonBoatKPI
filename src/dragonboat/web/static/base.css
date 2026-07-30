@@ -1006,12 +1006,8 @@ a:hover {
     background: var(--color-bg);
 }
 
-.card.expanded #chart-plotly-container {
-    height: calc(100vh - 120px);
-}
-
-.card.expanded #chart-plotly-container iframe {
-    height: 100%;
+.card.expanded #echart-container {
+    height: calc(100vh - 140px) !important;
 }
 
 .card.expanded #chart-png-container {

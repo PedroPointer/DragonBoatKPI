@@ -2,11 +2,19 @@ function Calendario(opts) {
     var el = document.getElementById(opts.container);
     if (!el) return;
 
+    var initialYear = opts.year;
+    var initialMonth = opts.month;
+    if (!initialYear && opts.selectedYear) initialYear = opts.selectedYear;
+    if (!initialMonth && opts.selectedMonth) initialMonth = opts.selectedMonth;
+
     var state = {
-        year: opts.year || new Date().getFullYear(),
-        month: opts.month || new Date().getMonth() + 1,
+        year: initialYear || new Date().getFullYear(),
+        month: initialMonth || new Date().getMonth() + 1,
         diasConEntrenos: [],
         diasConCompeticion: [],
+        selectedDay: opts.selectedDay || null,
+        selectedMonth: opts.selectedMonth || null,
+        selectedYear: opts.selectedYear || null,
         onDiaClick: opts.onDiaClick || function() {}
     };
 
@@ -53,6 +61,13 @@ function Calendario(opts) {
             }
             if (dateStr === todayStr) {
                 classes.push("cal-day--today");
+            }
+            if (
+                state.selectedDay === d
+                && state.selectedMonth === state.month
+                && state.selectedYear === state.year
+            ) {
+                classes.push("cal-day--selected");
             }
             var clickHandler = '';
             html += '<div class="' + classes.join(" ") + '" data-day="' + d + '">' + d + '</div>';

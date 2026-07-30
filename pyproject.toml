@@ -19,7 +19,6 @@ dependencies = [
     "matplotlib>=3.8",
     "sqlalchemy>=2.0",
     "aiosqlite",
-    "plotly>=5.20",
 ]
 
 [project.optional-dependencies]

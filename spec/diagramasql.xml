@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-ER-diagram"?>
+<er-diagram name="Dragon Boat Analyzer Database Schema">
+    <!-- Entities/Tables -->
+    <entity name="CsvUpload">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="filename" type="VARCHAR(255)" primaryKey="false" nullable="false" unique="true"/>
+        <attribute name="uploaded_at" type="DATETIME" primaryKey="false" nullable="false" default="CURRENT_TIMESTAMP"/>
+        <attribute name="file_path" type="VARCHAR(255)" primaryKey="false" nullable="true"/>
+        <attribute name="kept" type="BOOLEAN" primaryKey="false" nullable="false" default="true"/>
+    </entity>
+    
+    <entity name="Boat">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="name" type="VARCHAR(10)" primaryKey="false" nullable="false" unique="true"/>
+        <attribute name="display_name" type="VARCHAR(50)" primaryKey="false" nullable="false"/>
+        <attribute name="num_rows" type="INTEGER" primaryKey="false" nullable="false"/>
+        <attribute name="total_persons" type="INTEGER" primaryKey="false" nullable="false"/>
+    </entity>
+    
+    <entity name="Sesion">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="csv_upload_id" type="INTEGER" primaryKey="false" nullable="true"/>
+        <attribute name="fecha_hora" type="DATETIME" primaryKey="false" nullable="false" default="CURRENT_TIMESTAMP"/>
+        <attribute name="test_number" type="INTEGER" primaryKey="false" nullable="true"/>
+        <attribute name="custom_name" type="VARCHAR(100)" primaryKey="false" nullable="true"/>
+        <attribute name="tipo" type="VARCHAR(20)" primaryKey="false" nullable="true"/>
+        <attribute name="boat_id" type="INTEGER" primaryKey="false" nullable="true"/>
+        <attribute name="categoria" type="VARCHAR(50)" primaryKey="false" nullable="true"/>
+        <attribute name="distancia" type="INTEGER" primaryKey="false" nullable="true" default="200"/>
+    </entity>
+    
+    <entity name="TestMetric">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="sesion_id" type="INTEGER" primaryKey="false" nullable="false" unique="true"/>
+        <attribute name="tiempo_total" type="FLOAT" primaryKey="false" nullable="false"/>
+        <attribute name="velocidad_media" type="FLOAT" primaryKey="false" nullable="false"/>
+        <attribute name="velocidad_maxima" type="FLOAT" primaryKey="false" nullable="false"/>
+        <attribute name="velocidad_min_post10" type="FLOAT" primaryKey="false" nullable="true"/>
+        <attribute name="aceleracion_max" type="FLOAT" primaryKey="false" nullable="false"/>
+        <attribute name="tiempo_11kmh" type="FLOAT" primaryKey="false" nullable="true"/>
+        <attribute name="tiempo_12kmh" type="FLOAT" primaryKey="false" nullable="true"/>
+        <attribute name="tiempo_50m" type="FLOAT" primaryKey="false" nullable="true"/>
+        <attribute name="tiempo_100m" type="FLOAT" primaryKey="false" nullable="true"/>
+        <attribute name="tiempo_150m" type="FLOAT" primaryKey="false" nullable="true"/>
+        <attribute name="num_paladas" type="INTEGER" primaryKey="false" nullable="false"/>
+        <attribute name="dist_media_palada" type="FLOAT" primaryKey="false" nullable="false"/>
+        <attribute name="dist_std_palada" type="FLOAT" primaryKey="false" nullable="false"/>
+        <attribute name="dist_max_palada" type="FLOAT" primaryKey="false" nullable="true"/>
+        <attribute name="dist_min_palada" type="FLOAT" primaryKey="false" nullable="true"/>
+        <attribute name="chart_filename" type="VARCHAR(255)" primaryKey="false" nullable="true"/>
+        <attribute name="tiempos_por_distancia" type="TEXT" primaryKey="false" nullable="true"/>
+    </entity>
+    
+    <entity name="CrewMember">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="nombre" type="VARCHAR(100)" primaryKey="false" nullable="false"/>
+        <attribute name="apellido" type="VARCHAR(100)" primaryKey="false" nullable="false"/>
+        <attribute name="categoria" type="VARCHAR(50)" primaryKey="false" nullable="true"/>
+        <attribute name="photo_path" type="VARCHAR(255)" primaryKey="false" nullable="true"/>
+        <attribute name="created_at" type="DATETIME" primaryKey="false" nullable="false" default="CURRENT_TIMESTAMP"/>
+    </entity>
+    
+    <entity name="CrewAssignment">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="sesion_id" type="INTEGER" primaryKey="false" nullable="false"/>
+        <attribute name="crew_member_id" type="INTEGER" primaryKey="false" nullable="false"/>
+        <attribute name="role" type="VARCHAR(20)" primaryKey="false" nullable="false"/>
+        <attribute name="side" type="VARCHAR(10)" primaryKey="false" nullable="true"/>
+        <attribute name="row_number" type="INTEGER" primaryKey="false" nullable="true"/>
+    </entity>
+    
+    <entity name="Category">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="name" type="VARCHAR(100)" primaryKey="false" nullable="false" unique="true"/>
+        <attribute name="created_at" type="DATETIME" primaryKey="false" nullable="false" default="CURRENT_TIMESTAMP"/>
+    </entity>
+    
+    <entity name="TestType">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="name" type="VARCHAR(20)" primaryKey="false" nullable="false" unique="true"/>
+        <attribute name="created_at" type="DATETIME" primaryKey="false" nullable="false" default="CURRENT_TIMESTAMP"/>
+    </entity>
+    
+    <entity name="TestGpsData">
+        <attribute name="id" type="INTEGER" primaryKey="true" nullable="false"/>
+        <attribute name="sesion_id" type="INTEGER" primaryKey="false" nullable="false" unique="true"/>
+        <attribute name="data_json" type="TEXT" primaryKey="false" nullable="false"/>
+        <attribute name="created_at" type="DATETIME" primaryKey="false" nullable="false" default="CURRENT_TIMESTAMP"/>
+    </entity>
+    
+    <!-- Relationships -->
+    <relationship name="csv_upload_to_sesion" entity1="CsvUpload" entity2="Sesion" cardinality="1:N">
+        <attribute name="csv_upload_id" type="INTEGER" foreignKey="true"/>
+    </relationship>
+    
+    <relationship name="boat_to_sesion" entity1="Boat" entity2="Sesion" cardinality="1:N">
+        <attribute name="boat_id" type="INTEGER" foreignKey="true"/>
+    </relationship>
+    
+    <relationship name="sesion_to_testmetric" entity1="Sesion" entity2="TestMetric" cardinality="1:1">
+        <attribute name="sesion_id" type="INTEGER" foreignKey="true"/>
+    </relationship>
+    
+    <relationship name="sesion_to_crewassignment" entity1="Sesion" entity2="CrewAssignment" cardinality="1:N">
+        <attribute name="sesion_id" type="INTEGER" foreignKey="true"/>
+    </relationship>
+    
+    <relationship name="crewassignment_to_crewmember" entity1="CrewAssignment" entity2="CrewMember" cardinality="N:1">
+        <attribute name="crew_member_id" type="INTEGER" foreignKey="true"/>
+    </relationship>
+    
+    <relationship name="sesion_to_testgpsdata" entity1="Sesion" entity2="TestGpsData" cardinality="1:1">
+        <attribute name="sesion_id" type="INTEGER" foreignKey="true"/>
+    </relationship>
+</er-diagram>

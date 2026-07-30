@@ -1,6 +1,7 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}{{ test.custom_name or "Prueba #" ~ test.test_number }} — Dragon Boat Analyzer{% endblock %}
 {% block extra_head %}
+<script src="/static/vendor/echarts.min.js"></script>
 <style>
 .mapa-container {
     height: 250px;
@@ -92,6 +93,114 @@
 }
 .crew-option .cname { color: #e2e8f0; font-size: 0.8rem; }
 .crew-option .ccat { color: #64748b; font-size: 0.7rem; margin-left: auto; }
+
+/* ── Datos generales (formato reporte) ── */
+.datos-generales {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.dg-header {
+    border-bottom: 1px solid #334155;
+    padding-bottom: 0.75rem;
+}
+.dg-titulo {
+    color: #f1f5f9;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+.dg-fecha {
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+.dg-tiempo-total {
+    background: #1e293b;
+    border-left: 3px solid #3b82f6;
+    padding: 0.6rem 0.9rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.dg-tiempo-total .dg-label { color: #cbd5e1; }
+.dg-tiempo-total .dg-value {
+    color: #f1f5f9;
+    font-weight: 600;
+    font-family: 'Consolas', 'Courier New', monospace;
+}
+.dg-seccion h3 {
+    color: #cbd5e1;
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+}
+.dg-seccion ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.dg-seccion li {
+    color: #cbd5e1;
+    font-size: 0.92rem;
+    padding-left: 1.1rem;
+    position: relative;
+}
+.dg-seccion li::before {
+    content: "•";
+    color: #64748b;
+    position: absolute;
+    left: 0.25rem;
+}
+.dg-value-inline {
+    color: #f1f5f9;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-weight: 500;
+}
+
+/* ── Chart legend boxes ── */
+#chart-legends {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 10px 0 4px 0;
+}
+.legend-box {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.legend-box .legend-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 2px;
+}
+.legend-box .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: #94a3b8;
+}
+.legend-box .legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
 </style>
 {% endblock %}
 
@@ -109,52 +218,55 @@
 <h1>{% if test.custom_name %}{{ test.custom_name }}{% else %}Prueba #{{ test.test_number }}{% endif %}</h1>
 <p class="page-meta">
     {% if test.boat %}{{ test.boat.display_name }}{% endif %}
-    {% if test.categoria %} — {{ test.categoria }}{% endif %}
+    {% if test.categoria %} — {{ test.categoria.name }}{% endif %}
 </p>
 
-{% if test.metric %}
+{% if test %}
 {# ── Encabezado de métricas + Editar prueba ── #}
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <h2 style="margin-bottom: 0;">Métricas</h2>
-        <div class="big-time">{{ test.metric.tiempo_total|duration }}</div>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <h2 style="margin-bottom: 0;">Métricas</h2>
+            <button id="btn-toggle-edit" class="btn small btn-secondary" type="button" onclick="toggleEditarPrueba()">Editar prueba ▾</button>
+        </div>
+        <div class="big-time">{{ test.tiempo_total|duration }}</div>
     </div>
 
     <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
         <div class="stat-card">
             <div class="label">Vel. máxima</div>
-            <div class="value">{{ test.metric.velocidad_maxima|comma }}</div>
+            <div class="value">{{ test.velocidad_maxima|comma }}</div>
             <div class="sub">km/h</div>
         </div>
         <div class="stat-card">
             <div class="label">Vel. media</div>
-            <div class="value">{{ test.metric.velocidad_media|comma }}</div>
+            <div class="value">{{ test.velocidad_media|comma }}</div>
             <div class="sub">km/h</div>
         </div>
         <div class="stat-card">
             <div class="label">0 → 12 km/h</div>
-            <div class="value">{{ test.metric.tiempo_12kmh|duration if test.metric.tiempo_12kmh else '—' }}</div>
+            <div class="value">{{ test.tiempo_12kmh|duration if test.tiempo_12kmh else '—' }}</div>
             <div class="sub">hh:mm:ss,mm</div>
         </div>
         <div class="stat-card">
             <div class="label">Paladas</div>
-            <div class="value">{{ test.metric.num_paladas }}</div>
+            <div class="value">{{ test.num_paladas }}</div>
             <div class="sub">total</div>
         </div>
         <div class="stat-card">
             <div class="label">Dist. palada</div>
-            <div class="value">{{ test.metric.dist_media_palada|comma }}</div>
+            <div class="value">{{ test.dist_media_palada|comma }}</div>
             <div class="sub">m</div>
         </div>
         <div class="stat-card">
             <div class="label">Consistencia</div>
-            <div class="value">{{ test.metric.dist_std_palada|comma if test.metric.dist_std_palada > 0 else '—' }}</div>
+            <div class="value">{{ test.dist_std_palada|comma if test.dist_std_palada > 0 else '—' }}</div>
             <div class="sub">m (std)</div>
         </div>
     </div>
 
-    {# Editar prueba - siempre visible #}
-    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #334155;">
+    {# Editar prueba - oculto por defecto, se abre con el botón #}
+    <div id="editar-prueba-panel" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #334155;" hidden>
         <h3 style="color: #94a3b8; font-size: 0.85rem; font-weight: bold; margin-bottom: 1rem;">Editar prueba</h3>
         <form action="/test/{{ test.id }}" method="post" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
             <div class="field">
@@ -182,7 +294,7 @@
                 <select name="categoria">
                     <option value="">— Categoría —</option>
                     {% for c in categorias %}
-                    <option value="{{ c }}" {% if test.categoria == c %}selected{% endif %}>{{ c }}</option>
+                    <option value="{{ c }}" {% if test.categoria and test.categoria.name == c %}selected{% endif %}>{{ c }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -191,7 +303,7 @@
                 <select name="tipo">
                     <option value="">— Tipo —</option>
                     {% for t in tipos %}
-                    <option value="{{ t.name }}" {% if test.tipo == t.name %}selected{% endif %}>{{ t.name }}</option>
+                    <option value="{{ t.name }}" {% if test.tipo and test.tipo.name == t.name %}selected{% endif %}">{{ t.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -209,7 +321,7 @@
     <div id="mapa-trayectoria" class="mapa-container"></div>
 </div>
 
-{# ── Visualizador de gráficas ── #}
+{# ── Visualizador de gráficas (ECharts) ── #}
 <div class="card" id="chart-card">
     <div class="chart-toggle-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
         <h2 style="margin-bottom: 0;">Análisis de la carrera</h2>
@@ -219,16 +331,20 @@
                 <input type="checkbox" data-panel="speed" checked style="margin:0;"> Velocidad
             </label>
             <label style="font-size:0.8rem;color:#94a3b8;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
-                <input type="checkbox" data-panel="roll" checked style="margin:0;"> Balanceo
+                <input type="checkbox" data-panel="roll" style="margin:0;"> Balanceo
             </label>
             <label style="font-size:0.8rem;color:#94a3b8;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
-                <input type="checkbox" data-panel="pitch" checked style="margin:0;"> Cabeceo
+                <input type="checkbox" data-panel="pitch" style="margin:0;"> Cabeceo
             </label>
             <label style="font-size:0.8rem;color:#94a3b8;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
                 <input type="checkbox" data-panel="dist" checked style="margin:0;"> Dist/palada
             </label>
-            <button class="btn small btn-secondary" id="btn-toggle-chart">PNG</button>
-            <button class="btn small btn-secondary" id="btn-expand-chart">Expandir ⛶</button>
+            <label style="font-size:0.8rem;color:#94a3b8;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                <input type="checkbox" data-overlay="peaks" checked style="margin:0;"> Nº palada
+            </label>
+            <button class="btn small btn-secondary" id="btn-reset-zoom" type="button">Reset zoom</button>
+            <button class="btn small btn-secondary" id="btn-toggle-chart" type="button">PNG</button>
+            <button class="btn small btn-secondary" id="btn-expand-chart" type="button">Expandir ⛶</button>
             <a class="btn small" href="/test/{{ test.id }}/chart.png" download id="btn-download">Descargar PNG</a>
             {% endif %}
         </div>
@@ -240,8 +356,8 @@
              onerror="this.closest('.card').querySelector('#btn-download').style.display='none';var p=this.parentElement;p.innerHTML='<p style=\"color:#64748b;text-align:center;\">Gráfica no disponible</p>';">
     </div>
 
-    {# Vista Plotly (default — lazy load on first render) #}
-    <div id="chart-plotly-container"></div>
+    {# Vista ECharts (default) #}
+    <div id="echart-container" style="width:100%; height:560px;"></div>
 </div>
 {% endif %}
 
@@ -249,81 +365,72 @@
 <div class="card">
     <h2>Datos generales</h2>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
-        <div>
-            <h3 style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Tramos</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Tramo</th>
-                        <th>Tiempo (s)</th>
-                    </tr>
-                </thead>
-            <tbody>
-                {% set tpd_str = test.metric.tiempos_por_distancia or '' %}
-                {% if tpd_str %}
-                    {% set tpd = tpd_str | from_json %}
-                    {% for marker, tiempo in tpd.items() %}
-                    <tr {% if loop.last %}>class="tramo-final"{% endif %}>
-                        <td {% if loop.last %}><strong>0 → {{ marker }}m</strong>{% else %}>0 → {{ marker }}m{% endif %}</td>
-                        <td {% if loop.last %}><strong>{{ tiempo|duration }}</strong>{% else %}>{{ tiempo|duration }}{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    {# Legacy fallback for tests without tiempos_por_distancia #}
-                    {% if test.metric.tiempo_50m %}
-                    <tr><td>0 → 50m</td><td>{{ test.metric.tiempo_50m|duration }}</td></tr>
+    <div class="datos-generales">
+        <div class="dg-header">
+            <div class="dg-titulo">Dragon Boat - {{ test.distancia.metros if test.distancia else '?' }}m</div>
+            <div class="dg-fecha">{{ test.fecha_hora.strftime("%d/%m/%Y %H:%M") }} · Prueba #{{ test.test_number or '?' }}</div>
+        </div>
+
+        <div class="dg-tiempo-total">
+            <span class="dg-icon">⏱️</span>
+            <span class="dg-label">Tiempo total:</span>
+            <span class="dg-value">{{ test.tiempo_total|duration }}</span>
+        </div>
+
+        <div class="dg-seccion">
+            <h3>📍 Tiempos por sector</h3>
+            <ul>
+                <li>
+                    Aceleracion 0 a 12 km/h:
+                    <span class="dg-value-inline">
+                        {{ test.tiempo_12kmh|duration if test.tiempo_12kmh else '—' }}
+                    </span>
+                </li>
+                {% for s in sectores %}
+                <li>
+                    {% if loop.first %}
+                        0 a {{ s.to }}m:
+                    {% else %}
+                        {{ s.from }} a {{ s.to }}m:
                     {% endif %}
-                    {% if test.metric.tiempo_100m %}
-                    <tr><td>0 → 100m</td><td>{{ test.metric.tiempo_100m|duration }}</td></tr>
-                    {% endif %}
-                    {% if test.metric.tiempo_150m %}
-                    <tr><td>0 → 150m</td><td>{{ test.metric.tiempo_150m|duration }}</td></tr>
-                    {% endif %}
-                    <tr><td><strong>0 → {{ test.metric.distancia or 200 }}m</strong></td><td><strong>{{ test.metric.tiempo_total|duration }}</strong></td></tr>
+                    <span class="dg-value-inline">
+                        {% if s.t_sector is not none %}{{ s.t_sector|duration }}{% else %}—{% endif %}
+                        {% if s.vel is not none %}({{ s.vel|comma_es }}km/h){% endif %}
+                        {% if not loop.first and s.t_acum is not none %}{{ s.t_acum|duration }}{% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="dg-seccion">
+            <h3>📊 Velocidad</h3>
+            <ul>
+                <li>Media: <span class="dg-value-inline">{{ test.velocidad_media|comma_es }}km/h ({{ (test.velocidad_media / 3.6)|comma_es(2) }} m/s)</span></li>
+                <li>Maxima: <span class="dg-value-inline">{{ test.velocidad_maxima|comma_es }}km/h</span></li>
+                {% if test.velocidad_min_post10 is not none %}
+                <li>Minima: <span class="dg-value-inline">{{ test.velocidad_min_post10|comma_es }}km/h (sin 15 primeras)</span></li>
                 {% endif %}
-            </tbody>
-            </table>
+                <li>Acel maxima: <span class="dg-value-inline">{{ test.aceleracion_max|comma_es(3) }}m/s2 ({{ (test.aceleracion_max / 9.81)|comma_es(3) }} G)</span></li>
+            </ul>
         </div>
 
-        <div>
-            <h3 style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Velocidades</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Métrica</th>
-                        <th>Valor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td>Vel. máxima</td><td>{{ test.metric.velocidad_maxima|comma }} km/h</td></tr>
-                    <tr><td>Vel. media</td><td>{{ test.metric.velocidad_media|comma }} km/h</td></tr>
-                    {% if test.metric.velocidad_min_post10 %}
-                    <tr><td>Vel. mínima post-10m</td><td>{{ test.metric.velocidad_min_post10|comma }} km/h</td></tr>
-                    {% endif %}
-                    <tr><td>Acel. máxima</td><td>{{ test.metric.aceleracion_max|comma }} m/s²</td></tr>
-                    <tr><td>0 → 12 km/h</td><td>{{ test.metric.tiempo_12kmh|duration if test.metric.tiempo_12kmh else '—' }}</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div>
-            <h3 style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Paladas</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Métrica</th>
-                        <th>Valor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td>Paladas totales</td><td>{{ test.metric.num_paladas }}</td></tr>
-                    <tr><td>Dist. media/palada</td><td>{{ test.metric.dist_media_palada|comma }} m</td></tr>
-                    <tr><td>Dist. máxima</td><td>{{ test.metric.dist_max_palada|comma if test.metric.dist_max_palada else '—' }} m</td></tr>
-                    <tr><td>Dist. mínima (sin la 15 primeras Paladas)</td><td>{{ test.metric.dist_min_palada|comma if test.metric.dist_min_palada else '—' }} m</td></tr>
-                    <tr><td>Consistencia (std)</td><td>{{ test.metric.dist_std_palada|comma if test.metric.dist_std_palada > 0 else '—' }} m</td></tr>
-                </tbody>
-            </table>
+        <div class="dg-seccion">
+            <h3>🔄 Paladas</h3>
+            <ul>
+                <li>Total: <span class="dg-value-inline">{{ test.num_paladas }}</span></li>
+                <li>Distancia por palada: <span class="dg-value-inline">{{ test.dist_media_palada|comma_es }} m</span></li>
+                {% if paladas_resumen.max_all is not none %}
+                <li>Maxima: <span class="dg-value-inline">{{ paladas_resumen.max_all|comma_es }} m</span></li>
+                <li>Minima: <span class="dg-value-inline">{{ paladas_resumen.min_salida|comma_es }} m (salida)</span></li>
+                <li>Minima: <span class="dg-value-inline">{{ paladas_resumen.min_sin10|comma_es }} m (sin 10 primeras)</span></li>
+                {% else %}
+                <li>Maxima: <span class="dg-value-inline">— m</span></li>
+                <li>Minima: <span class="dg-value-inline">— m (salida)</span></li>
+                <li>Minima: <span class="dg-value-inline">— m (sin 10 primeras)</span></li>
+                {% endif %}
+                <li>Consistencia: <span class="dg-value-inline">{{ test.dist_std_palada|comma_es if test.dist_std_palada and test.dist_std_palada > 0 else '—' }} m</span></li>
+            </ul>
         </div>
     </div>
 </div>
@@ -382,9 +489,59 @@ function toggleMapa() {
         ? "Mostrar mapa" : "Minimizar mapa";
 }
 
+function toggleEditarPrueba() {
+    var panel = document.getElementById("editar-prueba-panel");
+    var btn = document.getElementById("btn-toggle-edit");
+    if (!panel || !btn) return;
+    var isOpen = !panel.hasAttribute("hidden");
+    if (isOpen) {
+        panel.setAttribute("hidden", "");
+        btn.textContent = "Editar prueba ▾";
+    } else {
+        panel.removeAttribute("hidden");
+        btn.textContent = "Editar prueba ▴";
+    }
+}
+
 (function() {
     var container = document.getElementById("mapa-trayectoria");
     if (!container) return;
+
+    var STOPS = [
+        { spd: 0,   r: 239, g: 68,  b: 68  },
+        { spd: 3,   r: 249, g: 115, b: 22  },
+        { spd: 6,   r: 234, g: 179, b: 8   },
+        { spd: 9,   r: 132, g: 204, b: 22  },
+        { spd: 12,  r: 34,  g: 197, b: 94  },
+        { spd: 15,  r: 16,  g: 185, b: 129 }
+    ];
+
+    function speedToColor(spd) {
+        if (spd <= STOPS[0].spd) return "rgb(" + STOPS[0].r + "," + STOPS[0].g + "," + STOPS[0].b + ")";
+        if (spd >= STOPS[STOPS.length - 1].spd) {
+            var last = STOPS[STOPS.length - 1];
+            return "rgb(" + last.r + "," + last.g + "," + last.b + ")";
+        }
+        for (var i = 1; i < STOPS.length; i++) {
+            if (spd <= STOPS[i].spd) {
+                var a = STOPS[i - 1], b = STOPS[i];
+                var t = (spd - a.spd) / (b.spd - a.spd);
+                var r = Math.round(a.r + t * (b.r - a.r));
+                var g = Math.round(a.g + t * (b.g - a.g));
+                var bl = Math.round(a.b + t * (b.b - a.b));
+                return "rgb(" + r + "," + g + "," + bl + ")";
+            }
+        }
+        return "#22c55e";
+    }
+
+    function bearingRad(p1, p2) {
+        var dLon = (p2[1] - p1[1]) * Math.PI / 180;
+        var lat1 = p1[0] * Math.PI / 180, lat2 = p2[0] * Math.PI / 180;
+        var y = Math.sin(dLon) * Math.cos(lat2);
+        var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        return Math.atan2(y, x);
+    }
 
     fetch("/test/{{ test.id }}/trajectory")
         .then(function(r) { return r.json(); })
@@ -398,12 +555,68 @@ function toggleMapa() {
                 attribution: "&copy; OpenStreetMap contributors",
                 maxZoom: 18
             }).addTo(map);
-            var latlngs = data.points.map(function(p) { return [p[0], p[1]]; });
-            L.polyline(latlngs, {color: "#38bdf8", weight: 3}).addTo(map);
-            if (data.points.length > 0) {
-                L.circleMarker(latlngs[0], {color: "#22c55e", radius: 6}).addTo(map).bindTooltip("Salida");
-                L.circleMarker(latlngs[latlngs.length-1], {color: "#ef4444", radius: 6}).addTo(map).bindTooltip("Llegada");
+
+            var latlngs = [];
+            var speeds = [];
+            for (var i = 0; i < data.points.length; i++) {
+                latlngs.push([data.points[i][0], data.points[i][1]]);
+                speeds.push(data.points[i][2] || 0);
             }
+
+            for (var j = 1; j < latlngs.length; j++) {
+                var avgSpd = (speeds[j - 1] + speeds[j]) / 2;
+                L.polyline([latlngs[j - 1], latlngs[j]], {
+                    color: speedToColor(avgSpd),
+                    weight: 4,
+                    opacity: 0.9
+                }).addTo(map);
+            }
+
+            var startPt = data.gps_inicio && data.gps_inicio.lat != null
+                ? [data.gps_inicio.lat, data.gps_inicio.lon]
+                : latlngs[0];
+            var endPt = data.gps_fin && data.gps_fin.lat != null
+                ? [data.gps_fin.lat, data.gps_fin.lon]
+                : latlngs[latlngs.length - 1];
+
+            var angle = bearingRad(latlngs[0], latlngs[1]);
+            var deg = (angle * 180 / Math.PI) - 90;
+
+            L.marker(startPt, {
+                icon: L.divIcon({
+                    className: "",
+                    html: '<div style="transform:rotate(' + deg + 'deg);font-size:24px;line-height:1;text-align:center;">&#10148;</div>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                }),
+                interactive: false
+            }).addTo(map).bindTooltip("Salida");
+
+            L.marker(endPt, {
+                icon: L.divIcon({
+                    className: "",
+                    html: '<div style="font-size:26px;text-align:center;line-height:1;">&#127937;</div>',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32]
+                }),
+                interactive: false
+            }).addTo(map).bindTooltip("Llegada");
+
+            var legend = L.control({position: "bottomright"});
+            legend.onAdd = function() {
+                var div = L.DomUtil.create("div");
+                div.style.cssText = "background:rgba(0,0,0,.7);padding:6px 10px;border-radius:6px;font-size:11px;color:#fff;line-height:1.6;";
+                div.innerHTML =
+                    '<div style="font-weight:600;margin-bottom:3px;">Velocidad (km/h)</div>' +
+                    '<div><span style="display:inline-block;width:14px;height:10px;background:#ef4444;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>0–3</div>' +
+                    '<div><span style="display:inline-block;width:14px;height:10px;background:#f97316;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>3–6</div>' +
+                    '<div><span style="display:inline-block;width:14px;height:10px;background:#eab308;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>6–9</div>' +
+                    '<div><span style="display:inline-block;width:14px;height:10px;background:#84cc16;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>9–12</div>' +
+                    '<div><span style="display:inline-block;width:14px;height:10px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>12–15</div>';
+                return div;
+            };
+            legend.addTo(map);
+
             map.fitBounds(latlngs, {padding: [20, 20]});
             setTimeout(function() { map.invalidateSize(); }, 200);
         })
@@ -412,102 +625,555 @@ function toggleMapa() {
         });
 })();
 
-// ── Chart toggle: PNG ↔ Plotly + panel checkboxes ──
+// ── Chart: ECharts interactivo (pannable, pinch-zoom, sincronizado) ──
 (function() {
+    var container = document.getElementById("echart-container");
+    if (!container || typeof echarts === "undefined") return;
+
     var btn = document.getElementById("btn-toggle-chart");
     var pngContainer = document.getElementById("chart-png-container");
-    var plotlyContainer = document.getElementById("chart-plotly-container");
+    var expandBtn = document.getElementById("btn-expand-chart");
+    var resetBtn = document.getElementById("btn-reset-zoom");
+    var chartCard = document.getElementById("chart-card");
     var checkboxes = document.querySelectorAll('input[type=checkbox][data-panel]');
-    if (!btn || !pngContainer || !plotlyContainer) return;
+    var overlayCheckboxes = document.querySelectorAll('input[type=checkbox][data-overlay]');
+    if (!btn || !pngContainer) return;
 
     function getActivePanels() {
         var panels = [];
         checkboxes.forEach(function(cb) {
             if (cb.checked) panels.push(cb.getAttribute("data-panel"));
         });
-        return panels.length > 0 ? panels.join(",") : "speed,roll,pitch,dist";
+        return panels.length > 0 ? panels : ["speed", "roll", "pitch", "dist"];
     }
 
-    function calcHeight(panels) {
-        var list = panels.split(",");
-        var units = 0;
-        list.forEach(function(p) { units += (p === "speed" ? 3 : 1); });
-        return (units * 180 + 100) + "px";
-    }
-
-    // Default: Plotly loaded immediately with all panels
-    var iframe = document.createElement("iframe");
-    iframe.src = "/test/{{ test.id }}/chart-html?panels=" + getActivePanels();
-    iframe.style.cssText = "width:100%;height:" + calcHeight(getActivePanels()) + ";border:none;";
-    plotlyContainer.appendChild(iframe);
-    btn.textContent = "PNG";
-
-    // Checkbox change → reload iframe with new panels
-    checkboxes.forEach(function(cb) {
-        cb.addEventListener("change", function() {
-            var panels = getActivePanels();
-            iframe.src = "/test/{{ test.id }}/chart-html?panels=" + panels;
-            iframe.style.height = calcHeight(panels);
+    function getActiveOverlays() {
+        var overlays = { peaks: true };
+        overlayCheckboxes.forEach(function(cb) {
+            overlays[cb.getAttribute("data-overlay")] = cb.checked;
         });
+        return overlays;
+    }
+
+    var chart = echarts.init(container, null, { renderer: "canvas" });
+    var dataCache = null;
+    var initialRange = null;
+
+    function fmtT(seconds) {
+        if (seconds < 0) return "-" + fmtT(-seconds);
+        var m = Math.floor(seconds / 60);
+        var s = seconds - m * 60;
+        return m + ":" + (s < 10 ? "0" : "") + s.toFixed(2);
+    }
+
+    function buildOption(data, panels, overlays) {
+        overlays = overlays || { peaks: true };
+        var time = data.time;
+        var speed = data.speed;
+        var lean = data.lean;
+        var pitch = data.pitch;
+        var peakTimes = data.peak_times || [];
+        var peakSpeeds = data.peak_speeds || [];
+        var valleyTimes = data.valley_times || [];
+        var distPp = data.dist_por_palada || [];
+        var tpd = data.tiempos_por_distancia || {};
+        var velMedia = data.velocidad_media || 0;
+        var velMax = data.velocidad_maxima || 0;
+        var t12 = data.tiempo_12kmh;
+        var distMedia = data.dist_media_palada || 0;
+        var tiempoTotal = data.tiempo_total || 0;
+
+        var active = panels.slice();
+        var grids = [];
+        var xAxes = [];
+        var yAxes = [];
+        var series = [];
+
+        var PANEL_TITLES = {
+            speed: "Velocidad (km/h)",
+            roll:  "Balanceo (Roll) (°)",
+            pitch: "Cabeceo (Pitch) (°)",
+            dist:  "Distancia por palada (m)"
+        };
+
+        var TOP_MARGIN = 4;
+        var RESERVE_BOTTOM = active.length > 1 ? 18 : 0;
+        var GAP = active.length > 1 ? 4 : 1.5;
+        var totalUnits = 0;
+        active.forEach(function(p) { totalUnits += (p === "speed" ? 3 : 1); });
+        var usable = 100 - TOP_MARGIN - RESERVE_BOTTOM - (active.length - 1) * GAP;
+        var heightPerUnit = usable / totalUnits;
+
+        // Guardar top/bottom de cada grid para dibujar los títulos como graphic después
+        var panelRects = [];
+
+        var yTop = TOP_MARGIN;
+        var lastPanel = active[active.length - 1];
+        active.forEach(function(panel, idx) {
+            var units = (panel === "speed" ? 3 : 1);
+            var h = units * heightPerUnit;
+            var isLast = panel === lastPanel;
+            // NO pasar bottom a ECharts — con top+height se calcula solo.
+            // Esto evita que ECharts ignore el bottom y el grid se desborde.
+            grids.push({ left: 56, right: 24, top: yTop + "%", height: h + "%", containLabel: false });
+            panelRects.push({ panel: panel, topPct: yTop, heightPct: h, isLast: isLast });
+            xAxes.push({
+                type: "value",
+                gridIndex: grids.length - 1,
+                min: initialRange ? initialRange[0] : "dataMin",
+                max: initialRange ? initialRange[1] : "dataMax",
+                axisLine: { lineStyle: { color: "#94a3b8" } },
+                axisLabel: { color: "#94a3b8", fontSize: 10, formatter: fmtT },
+                splitLine: { lineStyle: { color: "#e0e0e0" } },
+                axisPointer: { label: { formatter: function(p) { return fmtT(p.value); } } }
+            });
+            yAxes.push({ gridIndex: grids.length - 1, scale: true, axisLine: { lineStyle: { color: "#94a3b8" } }, axisLabel: { color: "#94a3b8", fontSize: 10 }, splitLine: { lineStyle: { color: "#e0e0e0" } } });
+            yTop += h + (isLast ? 0 : GAP);
+        });
+
+        // ── Speed panel ──
+        if (active.indexOf("speed") >= 0) {
+            var i = active.indexOf("speed");
+            var speedSeriesIdx = series.length;
+            series.push({
+                name: "Velocidad",
+                type: "line",
+                xAxisIndex: i, yAxisIndex: i,
+                data: time.map(function(t, k) { return [t, speed[k]]; }),
+                showSymbol: false, sampling: "lttb",
+                lineStyle: { width: 2.2 },
+                z: 3
+            });
+            // markLine vel media
+            series[series.length - 1].markLine = {
+                silent: true, symbol: "none",
+                data: [{ yAxis: velMedia, lineStyle: { color: "#3498db", type: "dashed", width: 1.5 },
+                         label: { formatter: velMedia.toFixed(2) + " km/h", color: "#3498db", fontWeight: "bold", position: "insideStartTop" } }],
+                animation: false
+            };
+            // markLine roja en x=0 (salida) — replicada en TODOS los paneles abajo
+        }
+
+        // ── Roll panel ──
+        if (active.indexOf("roll") >= 0) {
+            var i = active.indexOf("roll");
+            var rollAlert = 10;
+            var rollColors = lean.map(function(v) {
+                if (Math.abs(v) > rollAlert) return "#c0392b";
+                return v >= 0 ? "#D2691E" : "#FFB347";
+            });
+            series.push({
+                name: "Roll",
+                type: "bar",
+                xAxisIndex: i, yAxisIndex: i,
+                data: time.map(function(t, k) { return { value: [t, lean[k]], itemStyle: { color: rollColors[k] } }; }),
+                barWidth: 2,
+                z: 2
+            });
+        }
+
+        // ── Pitch panel ──
+        if (active.indexOf("pitch") >= 0) {
+            var i = active.indexOf("pitch");
+            var pitchColors = pitch.map(function(v) { return v >= 0 ? "#6a9ad8" : "#1a3a8a"; });
+            series.push({
+                name: "Pitch",
+                type: "bar",
+                xAxisIndex: i, yAxisIndex: i,
+                data: time.map(function(t, k) { return { value: [t, pitch[k]], itemStyle: { color: pitchColors[k] } }; }),
+                barWidth: 2,
+                z: 2
+            });
+        }
+
+        // ── Dist per stroke panel ──
+        if (active.indexOf("dist") >= 0) {
+            var i = active.indexOf("dist");
+            if (distPp.length && peakTimes.length >= 2) {
+                var n = Math.min(distPp.length, peakTimes.length - 1);
+                var mid = [], heights = [], colors = [];
+                for (var k = 0; k < n; k++) {
+                    mid.push((peakTimes[k] + peakTimes[k + 1]) / 2);
+                    heights.push(distPp[k]);
+                    colors.push(heights[k] >= distMedia ? "#2ecc71" : "#e74c3c");
+                }
+                // Margen inferior: empuja el eje y=0 hacia arriba dentro del panel
+                var hMin = Math.min.apply(null, heights);
+                var hMax = Math.max.apply(null, heights);
+                // Escala Y: techo entero +1 metro por encima del máximo (ej. hMax=4.0 → max=5)
+                yAxes[i].max = Math.ceil(hMax) + 1;
+                // Min en 0: las barras anclan en cero, se ven los valores bajos.
+                // El layout con RESERVE_BOTTOM=18% ya deja espacio bajo el eje X.
+                yAxes[i].min = 0;
+                yAxes[i].splitLine = { lineStyle: { color: "#e0e0e0" } };
+                // Eje X: etiquetas con el número de palada en lugar del tiempo
+                // (el name/título del panel ya viene de PANEL_TITLES en el bucle principal)
+                xAxes[i].axisLabel.margin = 12;
+                // Formatter: a partir del tiempo, busca el nº de palada más cercano en `mid`
+                xAxes[i].axisLabel.formatter = function(value) {
+                    if (!mid || mid.length === 0) return "";
+                    var best = 0;
+                    var bestDist = Math.abs(value - mid[0]);
+                    for (var k = 1; k < mid.length; k++) {
+                        var d = Math.abs(value - mid[k]);
+                        if (d < bestDist) { bestDist = d; best = k; }
+                    }
+                    return String(best + 1);
+                };
+                series.push({
+                    name: "Dist/palada",
+                    type: "bar",
+                    xAxisIndex: i, yAxisIndex: i,
+                    data: mid.map(function(m, k) { return { value: [m, heights[k]], itemStyle: { color: colors[k] } }; }),
+                    barWidth: "70%",
+                    markLine: {
+                        silent: true, symbol: "none",
+                        data: [{ yAxis: distMedia, lineStyle: { color: "#c0392b", type: "dashed", width: 1.5 },
+                                 label: { formatter: distMedia.toFixed(2) + " m", color: "#c0392b", fontWeight: "bold", position: "insideStartTop" } }],
+                        animation: false
+                    },
+                    z: 2
+                });
+                var iBest = 0;
+                for (var b = 1; b < heights.length; b++) if (heights[b] > heights[iBest]) iBest = b;
+                series.push({
+                    name: "_best",
+                    type: "scatter",
+                    xAxisIndex: i, yAxisIndex: i,
+                    data: [[mid[iBest], heights[iBest]]],
+                    symbol: "path://M12,2L15.09,8.26L22,9.27L17,14.14L18.18,21.02L12,17.77L5.82,21.02L7,14.14L2,9.27L8.91,8.26Z",
+                    symbolSize: 28,
+                    symbolOffset: [0, -2],
+                    itemStyle: { color: "#f1c40f", borderColor: "#b8860b", borderWidth: 1, shadowBlur: 6, shadowColor: "rgba(184,134,11,0.6)" },
+                    label: {
+                        show: true,
+                        formatter: String(iBest + 1),
+                        color: "#b8860b",
+                        fontSize: 8,
+                        fontWeight: "bold",
+                        position: "inside",
+                        offset: [0, 1]
+                    },
+                    z: 6
+                });
+            } else {
+                yAxes[i].min = -1; yAxes[i].max = 1;
+            }
+        }
+
+        // ── Línea roja de salida x=0 + marcadores de distancia en TODOS los paneles ──
+        active.forEach(function(panel, i) {
+            var markLineData = [];
+            markLineData.push({
+                xAxis: 0,
+                lineStyle: { color: "#e74c3c", type: "solid", width: 2 },
+                label: { show: false }
+            });
+            var keys = Object.keys(tpd).map(function(k) { return parseInt(k, 10); }).sort(function(a, b) { return a - b; });
+            for (var ki = 0; ki < keys.length - 1; ki++) {
+                var k = keys[ki];
+                var t = tpd[String(k)];
+                if (t == null || t <= 0 || t >= tiempoTotal) continue;
+                var color = ki === keys.length - 2 ? "#f39c12" : "#888";
+                markLineData.push({
+                    xAxis: t,
+                    lineStyle: { color: color, type: "dashed", width: 1 },
+                    label: { show: panel === "speed", formatter: k + "m", color: "#555", position: "insideEndBottom", fontSize: 9 }
+                });
+            }
+            // Adjuntar markLine al primer series de este panel (o crear uno custom)
+            var firstSeries = null;
+            for (var s = 0; s < series.length; s++) {
+                if (series[s].xAxisIndex === i && series[s].name !== "_best") { firstSeries = series[s]; break; }
+            }
+            if (firstSeries) {
+                var existing = firstSeries.markLine || { silent: true, symbol: "none", data: [], animation: false };
+                existing.silent = true; existing.symbol = "none"; existing.animation = false;
+                existing.data = markLineData.concat(existing.data || []);
+                firstSeries.markLine = existing;
+            } else if (panel !== "dist") {
+                // Panel sin series: agregamos una línea invisible para soportar markLine
+                series.push({
+                    name: "_markers_" + panel,
+                    type: "line",
+                    xAxisIndex: i, yAxisIndex: i,
+                    data: [], showSymbol: false, z: 1,
+                    markLine: { silent: true, symbol: "none", data: markLineData, animation: false }
+                });
+            }
+        });
+
+        // ── Picos numerados y valles (en panel velocidad) ──
+        if (active.indexOf("speed") >= 0) {
+            var i = active.indexOf("speed");
+            // Valles (catch) — scatter
+            var valleyData = valleyTimes.map(function(vt) {
+                var idx = 0;
+                for (var j = 1; j < time.length; j++) if (time[j] >= vt) { idx = j - 1; break; }
+                return [vt, speed[idx] || 0];
+            });
+            if (valleyData.length) {
+                series.push({
+                    name: "_valleys",
+                    type: "scatter",
+                    xAxisIndex: i, yAxisIndex: i,
+                    data: valleyData,
+                    symbol: "circle", symbolSize: 5,
+                    itemStyle: { color: "#2980b9", opacity: 0.45 },
+                    z: 4
+                });
+            }
+            // Picos numerados (controlados por overlay "peaks")
+            if (overlays.peaks) {
+                var peakData = [];
+                for (var p = 0; p < peakTimes.length; p++) {
+                    peakData.push({
+                        name: String(p + 1),
+                        value: [peakTimes[p], peakSpeeds[p] || 0],
+                        label: { show: true, formatter: String(p + 1), color: "#1a1a1a", fontWeight: "bold", fontSize: 9,
+                                 backgroundColor: "rgba(255,255,255,0.9)", borderColor: "#666", borderWidth: 1, borderRadius: 3, padding: [1, 3] }
+                    });
+                }
+                if (peakData.length) {
+                    series.push({
+                        name: "_peaks",
+                        type: "scatter",
+                        xAxisIndex: i, yAxisIndex: i,
+                        data: peakData,
+                        symbol: "circle", symbolSize: 1,
+                        z: 5
+                    });
+                }
+            }
+        }
+
+        // ── dataZoom (inside pinch/drag + slider inferior) ──
+        var dataZoom = [
+            {
+                type: "inside",
+                xAxisIndex: xAxes.map(function(_, i) { return i; }),
+                zoomOnMouseWheel: true,
+                moveOnMouseMove: true,
+                moveOnTouch: true,
+                preventDefaultMouseMove: true
+            }
+        ];
+        if (active.length > 1) {
+            dataZoom.push({
+                type: "slider",
+                xAxisIndex: xAxes.map(function(_, i) { return i; }),
+                bottom: 18, height: 18,
+                showDataShadow: false,
+                showDetail: false,
+                fillerColor: "rgba(39,174,96,0.18)",
+                borderColor: "#94a3b8",
+                handleStyle: { color: "#27ae60" },
+                moveHandleStyle: { color: "#27ae60" }
+            });
+        }
+
+        // ── Títulos: nombre en negrita en la parte superior de cada gráfica ──
+        var titles = panelRects.map(function(rect, idx) {
+            return {
+                text: PANEL_TITLES[rect.panel] || "",
+                top: (rect.topPct + 0.3) + "%",
+                left: 56,
+                textStyle: {
+                    color: "#f1f5f9",
+                    fontSize: 11,
+                    fontWeight: "bold",
+                    fontFamily: "'Segoe UI', Arial, sans-serif"
+                }
+            };
+        });
+
+        var visualMapCfg = null;
+        if (active.indexOf("speed") >= 0) {
+            var speedIdx = series.findIndex(function(s) { return s.name === "Velocidad"; });
+            if (speedIdx >= 0) {
+                visualMapCfg = {
+                    show: false,
+                    dimension: 1,
+                    pieces: [
+                        { min: 0,  max: 3,  color: '#ef4444' },
+                        { min: 3,  max: 6,  color: '#f97316' },
+                        { min: 6,  max: 9,  color: '#eab308' },
+                        { min: 9,  max: 12, color: '#84cc16' },
+                        { min: 12, max: 15, color: '#22c55e' }
+                    ],
+                    seriesIndex: speedIdx,
+                    outOfRange: { color: '#22c55e' }
+                };
+            }
+        }
+
+        return {
+            animation: false,
+            backgroundColor: "#1e3a5f",
+            textStyle: { fontFamily: "Segoe UI, Arial, sans-serif", color: "#1a1a1a" },
+            grid: grids,
+            xAxis: xAxes,
+            yAxis: yAxes,
+            dataZoom: dataZoom,
+            visualMap: visualMapCfg,
+            axisPointer: { link: [{ xAxisIndex: "all" }] },
+            tooltip: {
+                trigger: "axis",
+                axisPointer: { type: "cross", lineStyle: { color: "#555" } },
+                backgroundColor: "rgba(255,255,255,0.96)",
+                borderColor: "#999", borderWidth: 1,
+                textStyle: { color: "#1a1a1a", fontSize: 11 },
+                formatter: function(params) {
+                    if (!params || !params.length) return "";
+                    var t = params[0].axisValue;
+                    var lines = ["<b>t = " + fmtT(t) + "</b>"];
+                    params.forEach(function(p) {
+                        if (p.seriesName && p.seriesName.charAt(0) === "_") return;
+                        var v = p.value;
+                        var y = Array.isArray(v) ? v[1] : v;
+                        if (typeof y !== "number") return;
+                        var unit = "";
+                        if (p.seriesName === "Velocidad") unit = " km/h";
+                        else if (p.seriesName === "Roll" || p.seriesName === "Pitch") unit = "°";
+                        else if (p.seriesName === "Dist/palada") unit = " m";
+                        lines.push(p.marker + " " + p.seriesName + ": " + y.toFixed(2) + unit);
+                    });
+                    return lines.join("<br>");
+                }
+            },
+            series: series,
+            title: titles
+        };
+    }
+
+    function rebuild() {
+        if (!dataCache) return;
+        chart.setOption(buildOption(dataCache, getActivePanels(), getActiveOverlays()), true);
+        renderLegends(getActivePanels());
+    }
+
+    function renderLegends(panels) {
+        var wrap = document.getElementById("chart-legends");
+        if (!wrap) {
+            wrap = document.createElement("div");
+            wrap.id = "chart-legends";
+            container.parentElement.insertBefore(wrap, container.nextSibling);
+        }
+        wrap.innerHTML = "";
+
+        if (panels.indexOf("speed") >= 0) {
+            var box = document.createElement("div");
+            box.className = "legend-box";
+            box.innerHTML =
+                '<div class="legend-title">Velocidad (km/h)</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#ef4444;"></span>0–3</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#f97316;"></span>3–6</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#eab308;"></span>6–9</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#84cc16;"></span>9–12</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#22c55e;"></span>12–15</div>';
+            wrap.appendChild(box);
+        }
+
+        if (panels.indexOf("roll") >= 0) {
+            var box = document.createElement("div");
+            box.className = "legend-box";
+            box.innerHTML =
+                '<div class="legend-title">Balanceo (°)</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#D2691E;"></span>+ izquierda</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#FFB347;"></span>− derecha</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#c0392b;"></span>>10° alerta</div>';
+            wrap.appendChild(box);
+        }
+
+        if (panels.indexOf("pitch") >= 0) {
+            var box = document.createElement("div");
+            box.className = "legend-box";
+            box.innerHTML =
+                '<div class="legend-title">Cabeceo (°)</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#6a9ad8;"></span>+ arriba</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#1a3a8a;"></span>− abajo</div>';
+            wrap.appendChild(box);
+        }
+
+        if (panels.indexOf("dist") >= 0) {
+            var box = document.createElement("div");
+            box.className = "legend-box";
+            var dm = dataCache ? (dataCache.dist_media_palada || 0).toFixed(2) : "—";
+            box.innerHTML =
+                '<div class="legend-title">Dist/palada (m)</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#2ecc71;"></span>≥ media (' + dm + ' m)</div>' +
+                '<div class="legend-item"><span class="legend-swatch" style="background:#e74c3c;"></span>< media</div>';
+            wrap.appendChild(box);
+        }
+    }
+
+    fetch("/test/{{ test.id }}/chart-data")
+        .then(function(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function(data) {
+            dataCache = data;
+            var t0 = (data.time && data.time.length) ? data.time[0] : 0;
+            var tN = (data.time && data.time.length) ? data.time[data.time.length - 1] : 0;
+            initialRange = [Math.min(t0, -2), tN + 0.5];
+            rebuild();
+        })
+        .catch(function(err) {
+            container.innerHTML = '<p style="color:#64748b;text-align:center;padding:2rem;">Gráfica no disponible: ' + (err && err.message ? err.message : err) + '</p>';
+        });
+
+    // ── Panel toggles ──
+    checkboxes.forEach(function(cb) {
+        cb.addEventListener("change", rebuild);
+    });
+    overlayCheckboxes.forEach(function(cb) {
+        cb.addEventListener("change", rebuild);
     });
 
+    // ── Reset zoom ──
+    if (resetBtn) {
+        resetBtn.addEventListener("click", function() { chart.dispatchAction({ type: "dataZoom", start: 0, end: 100 }); });
+    }
+
+    // ── PNG toggle ──
     btn.addEventListener("click", function() {
-        if (plotlyContainer.style.display === "none") {
+        if (container.style.display === "none") {
             btn.textContent = "PNG";
             pngContainer.style.display = "none";
-            plotlyContainer.style.display = "block";
+            container.style.display = "block";
+            chart.resize();
         } else {
             btn.textContent = "Interactivo";
-            plotlyContainer.style.display = "none";
+            container.style.display = "none";
             pngContainer.style.display = "block";
         }
     });
 
-    // Expand button
-    var expandBtn = document.getElementById("btn-expand-chart");
-    var chartCard = document.getElementById("chart-card");
+    // ── Expand / collapse ──
     if (expandBtn && chartCard) {
-        var originalHeight = iframe.style.height;
-
+        var originalHeight = container.style.height;
         function expandChart() {
             chartCard.classList.add("expanded");
             document.body.classList.add("no-scroll");
             expandBtn.textContent = "Colapsar ⛶";
-            iframe.style.height = "calc(100vh - 120px)";
+            container.style.height = "calc(100vh - 140px)";
+            chart.resize();
         }
-
         function collapseChart() {
             chartCard.classList.remove("expanded");
             document.body.classList.remove("no-scroll");
             expandBtn.textContent = "Expandir ⛶";
-            iframe.style.height = originalHeight;
+            container.style.height = originalHeight;
+            chart.resize();
         }
-
         expandBtn.addEventListener("click", function() {
-            if (chartCard.classList.contains("expanded")) {
-                collapseChart();
-            } else {
-                expandChart();
-            }
+            if (chartCard.classList.contains("expanded")) collapseChart(); else expandChart();
         });
-
         document.addEventListener("keydown", function(e) {
-            if (e.key === "Escape" && chartCard.classList.contains("expanded")) {
-                collapseChart();
-            }
-        });
-
-        // Update originalHeight when checkboxes change panel count
-        checkboxes.forEach(function(cb) {
-            cb.addEventListener("change", function() {
-                if (!chartCard.classList.contains("expanded")) {
-                    var panels = getActivePanels();
-                    originalHeight = calcHeight(panels);
-                    iframe.style.height = originalHeight;
-                }
-            });
+            if (e.key === "Escape" && chartCard.classList.contains("expanded")) collapseChart();
         });
     }
+
+    // ── Resize ──
+    window.addEventListener("resize", function() { chart.resize(); });
 })();
 
 // ── Interactive boat crew configurator with seat-markers ──

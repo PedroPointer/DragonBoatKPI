@@ -1,0 +1,177 @@
+// Dragon Boat Analyzer - Database Schema (DBML)
+// https://dbdiagram.io/d  -- Abrir aqui para editar graficamente
+// Generado desde src/dragonboat/db_models.py
+
+Project "Dragon Boat Analyzer" {
+  database_type: "SQLite"
+  note: "Aplicación web de gestión deportiva para barco dragón"
+}
+
+// ── Configuración de la app (key-value) ──
+Table app_settings {
+  key varchar(64) [pk, note: "Identificador de la config (e.g. umbral_velocidad_parado)"]
+  value varchar(255) [not null]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`, not null]
+
+  note: "Configs editables desde /config. Seed: umbral_velocidad_parado=5.0"
+}
+
+// ── Catálogo de distancias (200/500/1000/2000) ──
+Table distancias {
+  id integer [pk, increment]
+  metros integer [unique, not null, note: "200 | 500 | 1000 | 2000"]
+  descripcion varchar(50) [not null]
+  orden integer [not null, note: "Orden en selects"]
+
+  note: "Catálogo de distancias válidas. 1:1 con test_metrics."
+}
+
+// ── Sesiones diarias (un día = un entreno) ──
+Table sesiones {
+  id integer [pk, increment]
+  fecha date [null, note: "Día del entreno"]
+  categoria varchar(50) [null, note: "Categoría genérica del día (texto libre)"]
+  tipo varchar(20) [null, note: "Tipo genérico del día (texto libre)"]
+
+  distancia_total_nominal integer [default: 0, not null]
+  distancia_total_real float [default: 0.0, not null]
+  num_pruebas integer [default: 0, not null]
+  num_archivos integer [default: 0, not null]
+
+  tiempo_total_entreno float [null, note: "Duración total del GPS del día (s)"]
+  tiempo_parado float [null, note: "Tiempo sin moverse (s)"]
+  tiempo_movimiento float [null, note: "Tiempo en movimiento (s)"]
+  vel_media_movimiento float [null, note: "Velocidad media en movimiento (km/h)"]
+  vel_max_dia float [null, note: "Velocidad máxima del día (km/h)"]
+  ritmo_medio float [null, note: "Ritmo medio (min/km)"]
+
+  note: "Una sesión = un día. Puede tener 0 o N pruebas (test_metrics)."
+}
+
+// ── Procedencia de CSVs subidos ──
+Table csv_uploads {
+  id integer [pk, increment]
+  filename varchar(255) [unique, not null]
+  uploaded_at datetime [default: `CURRENT_TIMESTAMP`, not null]
+  file_path varchar(255) [null]
+  kept boolean [default: true, not null]
+  metadata_date datetime [null, note: "Fecha del header del CSV"]
+  sesion_id integer [not null, ref: > sesiones.id]
+
+  note: "Un registro por CSV subido. Agrupado por día en la sesión."
+}
+
+// ── Datos GPS completos (25Hz) por CSV ──
+Table gps_data {
+  id integer [pk, increment]
+  csv_upload_id integer [unique, not null, ref: > csv_uploads.id, note: "1:1 con CSV, ondelete CASCADE"]
+  sesion_id integer [not null, ref: > sesiones.id, note: "Para queries por día"]
+  data_json text [not null, note: "JSON con arrays: time, speed, lean, lat, lon, peaks..."]
+  created_at datetime [default: `CURRENT_TIMESTAMP`, not null]
+
+  note: "GPS completo del CSV. Puede NO tener test_metrics derivados."
+}
+
+// ── Barcos (DB12 / DB22) ──
+Table boats {
+  id integer [pk, increment]
+  name varchar(10) [unique, not null]
+  display_name varchar(50) [not null]
+  num_rows integer [not null]
+  total_persons integer [not null]
+
+  note: "Catálogo de embarcaciones."
+}
+
+// ── Tipos de prueba (entreno / competición) ──
+Table test_types {
+  id integer [pk, increment]
+  name varchar(20) [unique, not null]
+  created_at datetime [default: `CURRENT_TIMESTAMP`, not null]
+
+  note: "CRUD dinámico. Seed: entreno, competición."
+}
+
+// ── Categorías de competición ──
+Table categories {
+  id integer [pk, increment]
+  name varchar(100) [unique, not null]
+  created_at datetime [default: `CURRENT_TIMESTAMP`, not null]
+
+  note: "CRUD dinámico. Seed: Open Sénior, Open Veterano, etc."
+}
+
+// ── Pruebas (un tramo = un test de velocidad) ──
+Table test_metrics {
+  id integer [pk, increment]
+  sesion_id integer [not null, ref: > sesiones.id, note: "FK al día"]
+  csv_upload_id integer [null, ref: > csv_uploads.id, note: "Proveniencia (nullable = manual) — ON DELETE CASCADE"]
+  gps_data_id integer [null, ref: > gps_data.id, note: "GPS del que sale (nullable)"]
+
+  fecha_hora datetime [not null, note: "Momento exacto de la prueba"]
+  test_number integer [null, note: "Ordinal dentro del día"]
+  custom_name varchar(100) [null]
+
+  distancia_id integer [not null, ref: > distancias.id]
+  boat_id integer [null, ref: > boats.id]
+  tipo_id integer [null, ref: > test_types.id, note: "Override de sesion.tipo"]
+  categoria_id integer [null, ref: > categories.id, note: "Override de sesion.categoria"]
+  chart_filename varchar(255) [null, note: "Link al chart file"]
+
+  gps_inicio text [null, note: "JSON: {lat, lon, t}"]
+  gps_fin text [null, note: "JSON: {lat, lon, t}"]
+  tiempos_por_distancia text [null, note: "JSON: {\"50m\": 4.5, ...}"]
+  sectores_detalle text [null, note: "JSON: [{from,to,t_sector,t_acum,vel}, ...] pre-calculado al importar"]
+  paladas_detalle text [null, note: "JSON: [2.76, 4.72, ...] lista cruda de dist_por_palada"]
+
+  tiempo_total float [not null]
+  velocidad_media float [not null]
+  velocidad_maxima float [not null]
+  velocidad_min_post10 float [null]
+  aceleracion_max float [not null]
+  tiempo_12kmh float [null]
+  num_paladas integer [not null]
+  dist_media_palada float [not null]
+  dist_std_palada float [not null]
+  dist_max_palada float [null]
+  dist_min_palada float [null]
+
+  note: "Una fila por prueba de velocidad. 0..N por sesión."
+}
+
+// ── Tripulantes ──
+Table crew_members {
+  id integer [pk, increment]
+  nombre varchar(100) [not null]
+  apellido varchar(100) [not null]
+  categoria varchar(50) [null]
+  photo_path varchar(255) [null]
+  created_at datetime [default: `CURRENT_TIMESTAMP`, not null]
+}
+
+// ── Asignación de tripulación por prueba ──
+Table crew_assignments {
+  id integer [pk, increment]
+  test_metric_id integer [not null, ref: > test_metrics.id, note: "FK a prueba, no a sesión"]
+  crew_member_id integer [not null, ref: > crew_members.id]
+  role varchar(20) [not null, note: "tambor | remero | timonel"]
+  side varchar(10) [null, note: "estribor | babor"]
+  row_number integer [null, note: "1..10"]
+
+  indexes:
+    (test_metric_id, role, side, row_number) [unique, note: "uq_crew_position"]
+}
+
+// ── Relaciones explícitas ──
+Ref: sesiones.csv_uploads < csv_uploads.sesion_id
+Ref: sesiones.gps_data < gps_data.sesion_id
+Ref: sesiones.test_metrics < test_metrics.sesion_id
+Ref: csv_uploads.gps_data < gps_data.csv_upload_id
+Ref: csv_uploads.test_metrics < test_metrics.csv_upload_id
+Ref: gps_data.test_metrics < test_metrics.gps_data_id
+Ref: distancias.test_metrics < test_metrics.distancia_id
+Ref: boats.test_metrics < test_metrics.boat_id
+Ref: test_types.test_metrics < test_metrics.tipo_id
+Ref: categories.test_metrics < test_metrics.categoria_id
+Ref: test_metrics.crew_assignments < crew_assignments.test_metric_id
+Ref: crew_members.assignments < crew_assignments.crew_member_id

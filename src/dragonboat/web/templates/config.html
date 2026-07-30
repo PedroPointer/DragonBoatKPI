@@ -16,6 +16,10 @@
             <span class="current">🏷️ Categorías</span>
         {% elif section == "tipos" %}
             <span class="current">🧪 Tipos</span>
+        {% elif section == "distancias" %}
+            <span class="current">📏 Distancias</span>
+        {% elif section == "umbral" %}
+            <span class="current">🟢🔴 Umbral</span>
         {% elif section == "telegram" %}
             <span class="current">🤖 Telegram</span>
         {% endif %}
@@ -47,6 +51,20 @@
             <div>
                 <div class="config-name">🧪 Tipos de prueba</div>
                 <div class="config-meta">Gestionar tipos (entreno, competicion…)</div>
+            </div>
+            <span style="color: var(--color-primary); font-weight: bold; font-size: 1.1rem;">→</span>
+        </li>
+        <li onclick="window.location='/config/distancias'" style="cursor: pointer;">
+            <div>
+                <div class="config-name">📏 Distancias</div>
+                <div class="config-meta">Catálogo de distancias válidas (200/500/1000/2000m)</div>
+            </div>
+            <span style="color: var(--color-primary); font-weight: bold; font-size: 1.1rem;">→</span>
+        </li>
+        <li onclick="window.location='/config/umbral'" style="cursor: pointer;">
+            <div>
+                <div class="config-name">🟢🔴 Umbral parado / movimiento</div>
+                <div class="config-meta">Velocidad por debajo de la cual el GPS se considera parado</div>
             </div>
             <span style="color: var(--color-primary); font-weight: bold; font-size: 1.1rem;">→</span>
         </li>
@@ -279,6 +297,28 @@
             </div>
         </form>
     </div>
+</div>
+
+{% elif section == "umbral" %}
+<a href="/config" class="back-link">← Volver a configuración</a>
+<h2 style="margin-bottom: 1rem;">Umbral parado / movimiento</h2>
+
+<div class="card">
+    <h2>Velocidad umbral (km/h)</h2>
+    <p style="color: var(--color-text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+        Velocidad por debajo de la cual un sample GPS se considera <strong style="color:#ef4444;">parado</strong>
+        (rojo en el mapa). Por encima se considera <strong style="color:#22c55e;">en movimiento</strong> (verde).
+        El valor por defecto es 5.0 km/h.
+    </p>
+    <form action="/config/umbral" method="post" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
+        <div class="field">
+            <label>Umbral (km/h)</label>
+            <input type="number" name="umbral" min="0.5" max="20" step="0.1"
+                   value="{{ umbral_parado }}" required
+                   style="max-width: 140px;">
+        </div>
+        <button type="submit" class="btn">Guardar</button>
+    </form>
 </div>
 
 {% elif section == "telegram" %}
